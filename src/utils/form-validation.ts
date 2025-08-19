@@ -136,11 +136,15 @@ export const formValidationRules = {
       commonRules.minLength(1, '标签名称不能为空'),
       commonRules.maxLength(50, '标签名称最多50个字符')
     ],
-    color: [
-      commonRules.color('请输入有效的颜色代码，如 #FF0000')
+    alias: [
+      commonRules.maxLength(10, '别名最多10个字符')
     ],
-    description: [
-      commonRules.maxLength(200, '描述最多200个字符')
+    class: [
+      // 分类为可选字段，但如果有值则需要验证
+      commonRules.maxLength(50, '分类最多50个字符')
+    ],
+    remarks: [
+      commonRules.maxLength(500, '备注最多500个字符')
     ]
   },
 

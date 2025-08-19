@@ -99,8 +99,9 @@ describe('Form Validation Utils', () => {
 
     it('has tag validation rules', () => {
       expect(formValidationRules.tag.name).toBeDefined()
-      expect(formValidationRules.tag.color).toBeDefined()
-      expect(formValidationRules.tag.description).toBeDefined()
+      expect(formValidationRules.tag.alias).toBeDefined()
+      expect(formValidationRules.tag.class).toBeDefined()
+      expect(formValidationRules.tag.remarks).toBeDefined()
     })
 
     it('has task validation rules', () => {

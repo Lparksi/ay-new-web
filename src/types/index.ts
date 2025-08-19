@@ -24,8 +24,9 @@ export interface Merchant {
 export interface Tag {
   id: number
   name: string
-  color?: string
-  description?: string
+  alias?: string
+  class?: string
+  remarks?: string
   created_at?: string
   updated_at?: string
   deleted_at?: string | null

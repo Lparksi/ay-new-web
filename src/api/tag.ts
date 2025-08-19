@@ -27,9 +27,10 @@ export async function fetchTags(params: TagListParams = {}): Promise<PagedRespon
     // map backend fields to frontend shape
     const items = rawItems.map((it: any) => ({
       id: it.ID ?? it.id,
-      name: it.tag_name ?? it.name ?? it.alias ?? '',
-      color: it.color ?? it.class ?? '',
-      description: it.remarks ?? it.description ?? '',
+      name: it.tag_name ?? it.name ?? '',
+      alias: it.alias ?? it.alias_name ?? '',
+      class: it.class ?? it.Class ?? it.category ?? '',
+      remarks: it.remarks ?? it.description ?? '',
       created_at: it.CreatedAt ?? it.created_at,
       updated_at: it.UpdatedAt ?? it.updated_at,
       deleted_at: it.DeletedAt ?? it.deleted_at ?? null,
@@ -45,7 +46,14 @@ export async function fetchTags(params: TagListParams = {}): Promise<PagedRespon
 
 export async function createTag(payload: Partial<Tag>) {
   try {
-    const resp = await http.post('/merchant-tags', payload)
+    // map front-end keys to backend expected keys
+    const body = {
+      tag_name: payload.name,
+      alias: payload.alias,
+      class: payload.class,
+      remarks: payload.remarks,
+    }
+    const resp = await http.post('/merchant-tags', body)
     return resp.data
   } catch (e) {
     throw normalizeError(e)
@@ -54,7 +62,12 @@ export async function createTag(payload: Partial<Tag>) {
 
 export async function updateTag(id: number | string, payload: Partial<Tag>) {
   try {
-    const resp = await http.put(`/merchant-tags/${id}`, payload)
+  const body: any = {}
+  if (payload.name !== undefined) body.tag_name = payload.name
+  if (payload.alias !== undefined) body.alias = payload.alias
+  if (payload.class !== undefined) body.class = payload.class
+  if (payload.remarks !== undefined) body.remarks = payload.remarks
+  const resp = await http.put(`/merchant-tags/${id}`, body)
     return resp.data
   } catch (e) {
     throw normalizeError(e)
@@ -72,7 +85,14 @@ export async function deleteTag(id: number | string) {
 
 export async function batchCreateTags(tags: Partial<Tag>[]) {
   try {
-    const resp = await http.post('/merchant-tags/batch', { tags })
+    // convert each tag to backend shape
+    const body = { tags: tags.map(t => ({
+      tag_name: t.name,
+      alias: t.alias,
+      class: t.class,
+      remarks: t.remarks,
+    })) }
+    const resp = await http.post('/merchant-tags/batch', body)
     return resp.data
   } catch (e) {
     throw normalizeError(e)

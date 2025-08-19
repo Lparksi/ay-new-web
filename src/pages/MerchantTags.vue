@@ -26,6 +26,9 @@
         :selected-row-keys="selectedRowKeys"
         @select-change="handleSelectChange"
       >
+        <template #class="{ row }">
+          {{ findClassLabel(row.class) }}
+        </template>
         <template #status="{ row }">
           <t-tag :theme="row.deleted_at ? 'danger' : 'success'">
             {{ row.deleted_at ? '已删除' : '正常' }}
@@ -71,25 +74,38 @@
       v-model:visible="showModal"
       :title="isEditing ? '编辑标签' : '新建标签'"
       width="500px"
-      @confirm="handleSubmit"
+      @confirm="handleDialogConfirm"
       @cancel="handleCancel"
     >
       <t-form
         ref="formRef"
-        :model="formData"
+        :data="formData"
         :rules="formRules"
         label-width="100px"
+        @submit="onSubmit"
       >
         <t-form-item label="标签名称" name="name">
           <t-input v-model:value="formData.name" placeholder="请输入标签名称" />
         </t-form-item>
-        
-        <t-form-item label="标签颜色" name="color">
-          <t-input v-model:value="formData.color" placeholder="请输入颜色代码，如 #FF0000" />
+
+        <t-form-item label="别名" name="alias">
+          <t-input v-model:value="formData.alias" placeholder="请输入别名（可选）" />
         </t-form-item>
-        
-        <t-form-item label="描述" name="description">
-          <t-textarea v-model:value="formData.description" placeholder="请输入标签描述" />
+
+        <t-form-item label="分类" name="class">
+          <t-select 
+            v-model:value="formData.class" 
+            :options="classOptions" 
+            placeholder="请选择或输入新分类" 
+            filterable
+            creatable
+            clearable
+            @create="handleCreateClass"
+          />
+        </t-form-item>
+
+        <t-form-item label="备注" name="remarks">
+          <t-textarea v-model:value="formData.remarks" placeholder="请输入备注（可选）" />
         </t-form-item>
       </t-form>
     </t-dialog>
@@ -121,13 +137,16 @@
 
 <script setup lang="ts">
 import { ref, onMounted, reactive } from 'vue'
-import { Table, Button, Dialog, Form, FormItem, Input, Textarea, Tag, MessagePlugin } from 'tdesign-vue-next'
+import { Table, Button, Dialog, Form, FormItem, Input, Textarea, Tag, MessagePlugin, Cascader } from 'tdesign-vue-next'
 import { AddIcon } from 'tdesign-icons-vue-next'
 import { fetchTags, createTag, updateTag, deleteTag as deleteTagApi, batchCreateTags } from '../api/tag'
 import type { Tag as TagType } from '../types'
 import { formValidationRules } from '../utils/form-validation'
 import { handleError } from '../utils/error-handler'
+import { useAuthStore } from '../stores/auth'
+import { http } from '../api/index'
 
+const authStore = useAuthStore()
 const tags = ref<TagType[]>([])
 const loading = ref(false)
 const showModal = ref(false)
@@ -146,20 +165,71 @@ const pagination = reactive({
 const formData = reactive({
   id: null as number | null,
   name: '',
-  color: '',
-  description: '',
+  alias: '',
+  class: '' as string,
+  remarks: '',
 })
+
+// classOptions will be loaded from backend by extracting distinct `class` values from tags
+const classOptions = ref<{ label: string; value: string }[]>([])
+
+async function loadClassOptions() {
+  try {
+    const resp = await http.get('/merchant-tags/classes')
+    if (resp.data && resp.data.data) {
+      classOptions.value = resp.data.data
+    } else {
+      classOptions.value = []
+    }
+  } catch (err) {
+    // fallback: leave classOptions empty (UI will handle)
+    console.warn('loadClassOptions failed', err)
+    classOptions.value = []
+  }
+}
+
+function handleCreateClass(value: string | number) {
+  // 当用户输入新分类时，自动添加到选项列表中
+  const newOption = { label: String(value), value: String(value) }
+  if (!classOptions.value.find(option => option.value === String(value))) {
+    classOptions.value.push(newOption)
+  }
+  // 设置当前值为新创建的分类
+  formData.class = String(value)
+}
+
+// TDesign Form 提交处理
+function onSubmit({ validateResult, firstError }: any) {
+  if (validateResult === true) {
+    handleSubmit()
+  } else {
+    MessagePlugin.warning(firstError || '请检查表单输入')
+  }
+}
+
+// 对话框确认按钮处理
+function handleDialogConfirm() {
+  // 触发表单提交和验证
+  formRef.value?.submit()
+}
 
 const formRules = formValidationRules.tag
 
 const columns = [
   { colKey: 'id', title: 'ID', width: 80 },
   { colKey: 'name', title: '标签名称' },
-  { colKey: 'color', title: '颜色', width: 100 },
-  { colKey: 'description', title: '描述' },
+  { colKey: 'alias', title: '别名', width: 120 },
+  { colKey: 'class', title: '分类', width: 160 },
+  { colKey: 'remarks', title: '备注' },
   { colKey: 'status', title: '状态', width: 100 },
   { colKey: 'actions', title: '操作', width: 150 },
 ]
+
+function findClassLabel(val: string | undefined) {
+  if (!val) return ''
+  const opt = classOptions.value.find(o => o.value === val)
+  return opt?.label ?? String(val)
+}
 
 async function loadTags() {
   try {
@@ -198,8 +268,9 @@ function showBatchCreateForm() {
 function editTag(tag: TagType) {
   formData.id = tag.id
   formData.name = tag.name || ''
-  formData.color = tag.color || ''
-  formData.description = tag.description || ''
+  formData.alias = tag.alias || ''
+  formData.class = tag.class || ''
+  formData.remarks = tag.remarks || ''
   isEditing.value = true
   showModal.value = true
 }
@@ -211,8 +282,9 @@ async function handleSubmit() {
 
     const payload = {
       name: formData.name,
-      color: formData.color,
-      description: formData.description,
+      alias: formData.alias,
+      class: formData.class,
+      remarks: formData.remarks,
     }
 
     if (isEditing.value && formData.id) {
@@ -227,6 +299,8 @@ async function handleSubmit() {
 
     showModal.value = false
     await loadTags()
+    // 重新加载分类选项，确保新的分类会显示在下拉列表中
+    await loadClassOptions()
   } catch (error: any) {
     MessagePlugin.error('操作失败: ' + error.message)
   }
@@ -244,8 +318,9 @@ async function handleBatchSubmit() {
       const parts = line.split(',').map(p => p.trim())
       return {
         name: parts[0],
-        color: parts[1] || '',
-        description: parts[2] || '',
+        alias: parts[1] || '',
+        class: parts[2] || '',
+        remarks: parts[3] || '',
       }
     }).filter(tag => tag.name)
 
@@ -279,8 +354,9 @@ function handleBatchCancel() {
 function resetForm() {
   formData.id = null
   formData.name = ''
-  formData.color = ''
-  formData.description = ''
+  formData.alias = ''
+  formData.class = ''
+  formData.remarks = ''
 }
 
 async function deleteTag(tag: TagType) {
@@ -337,7 +413,10 @@ function handlePageChange(pageInfo: any) {
 }
 
 onMounted(() => {
-  loadTags()
+  ;(async () => {
+    await loadClassOptions()
+    await loadTags()
+  })()
 })
 </script>
 

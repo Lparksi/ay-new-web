@@ -1,9 +1,10 @@
 export function mapTagBackendToFrontend(it: any) {
   return {
     id: it.ID ?? it.id,
-    name: it.tag_name ?? it.name ?? it.alias ?? '',
-    color: it.color ?? it.class ?? '',
-    description: it.remarks ?? it.description ?? '',
+    name: it.tag_name ?? it.name ?? '',
+    alias: it.alias ?? it.alias_name ?? '',
+    class: it.class ?? it.Class ?? it.category ?? '',
+    remarks: it.remarks ?? it.description ?? '',
     created_at: it.CreatedAt ?? it.created_at,
     updated_at: it.UpdatedAt ?? it.updated_at,
     deleted_at: it.DeletedAt ?? it.deleted_at ?? null,
