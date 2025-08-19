@@ -1,0 +1,38 @@
+{
+  "name": "ay-new-web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report",
+    "type-check": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "axios": "^1.4.0",
+    "pinia": "^2.1.6",
+    "tdesign-vue-next": "^2.18.0",
+    "vue": "^3.3.4",
+    "vue-router": "^4.2.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.2",
+    "@types/jest": "^29.5.6",
+    "@types/node": "^20.5.0",
+    "@vitejs/plugin-vue": "^4.2.3",
+    "@vitest/ui": "^0.34.6",
+    "@vue/test-utils": "^2.4.1",
+    "happy-dom": "^10.5.2",
+    "jsdom": "^22.1.0",
+    "typescript": "^5.1.6",
+    "vite": "^5.0.0",
+    "vitest": "^0.34.6",
+    "vue-tsc": "^1.11.9"
+  }
+}
