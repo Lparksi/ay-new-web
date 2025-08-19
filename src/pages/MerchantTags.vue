@@ -25,6 +25,7 @@
         row-key="id"
         :selected-row-keys="selectedRowKeys"
         @select-change="handleSelectChange"
+        select-on-row-click
       >
         <template #class="{ row }">
           {{ findClassLabel(row.class) }}
@@ -60,12 +61,26 @@
 
       <!-- Batch Actions -->
       <div v-if="selectedRowKeys.length > 0" class="batch-actions">
-        <t-button theme="danger" @click="batchDelete">
-          批量删除 ({{ selectedRowKeys.length }})
-        </t-button>
-        <t-button theme="success" @click="batchRestore">
-          批量恢复 ({{ selectedRowKeys.length }})
-        </t-button>
+        <div class="batch-info">
+          已选择 <strong>{{ selectedRowKeys.length }}</strong> 个标签
+        </div>
+        <div class="batch-buttons">
+          <t-button theme="danger" variant="outline" @click="batchDelete">
+            <template #icon><delete-icon /></template>
+            批量删除
+          </t-button>
+          <t-button theme="success" variant="outline" @click="batchRestore">
+            <template #icon><refresh-icon /></template>
+            批量恢复
+          </t-button>
+          <t-button theme="primary" variant="outline" @click="batchExport">
+            <template #icon><download-icon /></template>
+            导出选中
+          </t-button>
+          <t-button theme="default" variant="outline" @click="clearSelection">
+            取消选择
+          </t-button>
+        </div>
       </div>
     </div>
 
@@ -137,14 +152,15 @@
 
 <script setup lang="ts">
 import { ref, onMounted, reactive } from 'vue'
-import { Table, Button, Dialog, Form, FormItem, Input, Textarea, Tag, MessagePlugin, Cascader } from 'tdesign-vue-next'
-import { AddIcon } from 'tdesign-icons-vue-next'
+import { Table, Button, Dialog, Form, FormItem, Input, Textarea, Tag, MessagePlugin, Select, DialogPlugin } from 'tdesign-vue-next'
+import { AddIcon, DeleteIcon, RefreshIcon, DownloadIcon } from 'tdesign-icons-vue-next'
 import { fetchTags, createTag, updateTag, deleteTag as deleteTagApi, batchCreateTags } from '../api/tag'
 import type { Tag as TagType } from '../types'
 import { formValidationRules } from '../utils/form-validation'
 import { handleError } from '../utils/error-handler'
 import { useAuthStore } from '../stores/auth'
 import { http } from '../api/index'
+import * as XLSX from 'xlsx'
 
 const authStore = useAuthStore()
 const tags = ref<TagType[]>([])
@@ -216,6 +232,7 @@ function handleDialogConfirm() {
 const formRules = formValidationRules.tag
 
 const columns = [
+  { colKey: 'row-select', type: 'multiple', width: 60 },
   { colKey: 'id', title: 'ID', width: 80 },
   { colKey: 'name', title: '标签名称' },
   { colKey: 'alias', title: '别名', width: 120 },
@@ -384,7 +401,83 @@ function handleSelectChange(selectedKeys: number[]) {
   selectedRowKeys.value = selectedKeys
 }
 
+function clearSelection() {
+  selectedRowKeys.value = []
+}
+
+function batchExport() {
+  if (selectedRowKeys.value.length === 0) {
+    MessagePlugin.warning('请先选择要导出的标签')
+    return
+  }
+  
+  try {
+    // 获取选中的标签数据
+    const selectedTags = tags.value.filter(tag => selectedRowKeys.value.includes(tag.id))
+    
+    // 准备Excel数据
+    const excelData = selectedTags.map(tag => ({
+      'ID': tag.id,
+      '标签名称': tag.name || '',
+      '别名': tag.alias || '',
+      '分类': tag.class || '',
+      '备注': tag.remarks || '',
+      '状态': tag.deleted_at ? '已删除' : '正常',
+      '创建时间': tag.created_at || '',
+      '更新时间': tag.updated_at || ''
+    }))
+    
+    // 创建工作簿和工作表
+    const workbook = XLSX.utils.book_new()
+    const worksheet = XLSX.utils.json_to_sheet(excelData)
+    
+    // 设置列宽
+    const columnWidths = [
+      { wch: 8 },   // ID
+      { wch: 20 },  // 标签名称
+      { wch: 15 },  // 别名
+      { wch: 15 },  // 分类
+      { wch: 30 },  // 备注
+      { wch: 10 },  // 状态
+      { wch: 20 },  // 创建时间
+      { wch: 20 }   // 更新时间
+    ]
+    worksheet['!cols'] = columnWidths
+    
+    // 添加工作表到工作簿
+    XLSX.utils.book_append_sheet(workbook, worksheet, '标签数据')
+    
+    // 生成文件名
+    const fileName = `标签导出_${new Date().toLocaleDateString().replace(/\//g, '-')}.xlsx`
+    
+    // 导出文件
+    XLSX.writeFile(workbook, fileName)
+    
+    MessagePlugin.success(`成功导出 ${selectedRowKeys.value.length} 个标签到 ${fileName}`)
+  } catch (error: any) {
+    MessagePlugin.error('导出失败: ' + error.message)
+  }
+}
+
 async function batchDelete() {
+  if (selectedRowKeys.value.length === 0) {
+    MessagePlugin.warning('请先选择要删除的标签')
+    return
+  }
+  
+  // 使用 DialogPlugin.confirm 显示确认对话框
+  const confirmed = await new Promise((resolve) => {
+    DialogPlugin.confirm({
+      header: '批量删除确认',
+      body: `确定要删除选中的 ${selectedRowKeys.value.length} 个标签吗？`,
+      theme: 'warning',
+      onConfirm: () => resolve(true),
+      onCancel: () => resolve(false),
+    })
+  })
+  
+  if (!confirmed) return
+  
   try {
     await Promise.all(selectedRowKeys.value.map(id => deleteTagApi(id)))
     MessagePlugin.success(`批量删除 ${selectedRowKeys.value.length} 个标签成功`)
@@ -396,6 +489,24 @@ async function batchDelete() {
 }
 
 async function batchRestore() {
+  if (selectedRowKeys.value.length === 0) {
+    MessagePlugin.warning('请先选择要恢复的标签')
+    return
+  }
+  
+  // 使用 DialogPlugin.confirm 显示确认对话框
+  const confirmed = await new Promise((resolve) => {
+    DialogPlugin.confirm({
+      header: '批量恢复确认',
+      body: `确定要恢复选中的 ${selectedRowKeys.value.length} 个标签吗？`,
+      theme: 'info',
+      onConfirm: () => resolve(true),
+      onCancel: () => resolve(false),
+    })
+  })
+  
+  if (!confirmed) return
+  
   try {
     await Promise.all(selectedRowKeys.value.map(id => updateTag(id, { deleted_at: null })))
     MessagePlugin.success(`批量恢复 ${selectedRowKeys.value.length} 个标签成功`)
@@ -446,8 +557,26 @@ onMounted(() => {
 .batch-actions {
   margin-top: 16px;
   padding: 16px;
-  background: #f5f5f5;
-  border-radius: 4px;
+  background: #f0f7ff;
+  border: 1px solid #d0e5ff;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.batch-info {
+  font-size: 14px;
+  color: #555;
+}
+
+.batch-info strong {
+  color: #0052d9;
+  font-weight: 600;
+}
+
+.batch-buttons {
   display: flex;
   gap: 12px;
 }

@@ -15,16 +15,29 @@ export interface PagedResponse<T> {
 
 export async function fetchUsers(params: UserListParams = {}): Promise<PagedResponse<User> | User[]> {
   try {
-  const resp = await http.get('/users', { params })
-  const d = resp.data
-  let rawItems: any[] = []
-  if (d && Array.isArray(d.items)) rawItems = d.items
-  else if (d && Array.isArray(d.data?.items)) rawItems = d.data.items
-  else if (d && Array.isArray(d.data)) rawItems = d.data
-  else if (Array.isArray(d)) rawItems = d
-
-  const items = rawItems.map(mapUserBackendToFrontend)
-  return { items, total: items.length }
+    const resp = await http.get('/users', { params })
+    const d = resp.data
+    
+    // 根据后端返回结构处理数据
+    if (d && d.data && d.data.list && Array.isArray(d.data.list)) {
+      // 后端返回格式: { code: 200, msg: "success", data: { list: [], total: 0, page: 1, page_size: 10 } }
+      const mappedItems = d.data.list.map(mapUserBackendToFrontend).filter(Boolean) as User[]
+      return { 
+        items: mappedItems, 
+        total: d.data.total || mappedItems.length 
+      }
+    } else if (d && Array.isArray(d.data)) {
+      // 简单数组格式
+      const mappedItems = d.data.map(mapUserBackendToFrontend).filter(Boolean) as User[]
+      return { items: mappedItems, total: mappedItems.length }
+    } else if (Array.isArray(d)) {
+      // 直接数组格式
+      const mappedItems = d.map(mapUserBackendToFrontend).filter(Boolean) as User[]
+      return { items: mappedItems, total: mappedItems.length }
+    }
+    
+    // 默认返回空数组
+    return { items: [], total: 0 }
   } catch (e) {
     throw normalizeError(e)
   }
