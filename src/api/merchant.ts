@@ -1,5 +1,6 @@
 import { http } from './index'
 import type { Merchant } from '../types'
+import { mapMerchantBackendToFrontend } from './_mappers'
 
 export interface MerchantListParams {
   page?: number
@@ -16,7 +17,14 @@ export interface PagedResponse<T> {
 export async function fetchMerchants(params: MerchantListParams = {}): Promise<PagedResponse<Merchant> | Merchant[]> {
   try {
     const resp = await http.get('/merchants', { params })
-    return resp.data
+    const d = resp.data
+    let rawItems: any[] = []
+    if (d && Array.isArray(d.items)) rawItems = d.items
+    else if (d && Array.isArray(d.data)) rawItems = d.data
+    else if (Array.isArray(d)) rawItems = d
+
+    const items = rawItems.map(mapMerchantBackendToFrontend)
+  return { items, total: items.length }
   } catch (e) {
     throw normalizeError(e)
   }
@@ -24,8 +32,11 @@ export async function fetchMerchants(params: MerchantListParams = {}): Promise<P
 
 export async function fetchMerchant(id: number | string): Promise<Merchant> {
   try {
-    const resp = await http.get(`/merchants/${id}`)
-    return resp.data
+  const resp = await http.get(`/merchants/${id}`)
+  const d = resp.data
+  // d may be wrapped or raw
+  const raw = d?.data ?? d
+  return mapMerchantBackendToFrontend(raw)
   } catch (e) {
     throw normalizeError(e)
   }

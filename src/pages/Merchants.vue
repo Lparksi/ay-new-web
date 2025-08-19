@@ -13,6 +13,7 @@
       <t-table
         :data="merchants"
         :columns="columns"
+        row-key="id"
         :loading="loading"
         :pagination="pagination"
         @page-change="handlePageChange"

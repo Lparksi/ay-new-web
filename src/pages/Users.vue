@@ -25,7 +25,14 @@ const editingUser = ref<User | null>(null)
 
 async function load() {
   const resp = await fetchUsers({ page: 1, pageSize: 50 })
-  users.value = resp.items || resp || []
+  // fetchUsers now returns a PagedResponse; guard in case of unexpected shapes
+  if (resp && Array.isArray((resp as any).items)) {
+    users.value = (resp as any).items
+  } else if (Array.isArray(resp as any)) {
+    users.value = resp as any
+  } else {
+    users.value = []
+  }
 }
 
 onMounted(() => {

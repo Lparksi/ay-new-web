@@ -1,5 +1,6 @@
 import { http } from './index'
 import type { User } from '../types'
+import { mapUserBackendToFrontend } from './_mappers'
 
 export interface UserListParams {
   page?: number
@@ -12,10 +13,18 @@ export interface PagedResponse<T> {
   total: number
 }
 
-export async function fetchUsers(params: UserListParams = {}): Promise<PagedResponse<User>> {
+export async function fetchUsers(params: UserListParams = {}): Promise<PagedResponse<User> | User[]> {
   try {
-    const resp = await http.get('/users', { params })
-    return resp.data as PagedResponse<User>
+  const resp = await http.get('/users', { params })
+  const d = resp.data
+  let rawItems: any[] = []
+  if (d && Array.isArray(d.items)) rawItems = d.items
+  else if (d && Array.isArray(d.data?.items)) rawItems = d.data.items
+  else if (d && Array.isArray(d.data)) rawItems = d.data
+  else if (Array.isArray(d)) rawItems = d
+
+  const items = rawItems.map(mapUserBackendToFrontend)
+  return { items, total: items.length }
   } catch (e) {
     throw normalizeError(e)
   }

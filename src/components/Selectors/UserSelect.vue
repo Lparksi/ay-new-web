@@ -35,7 +35,8 @@ export default defineComponent({
       loading.value = true
       try {
         const resp = await fetchUsers({ q: qs, page: 1, pageSize: props.pageSize })
-        options.value = (resp.items || []).map((u: any) => ({ label: u.username || u.full_name || (`user-${u.id}`), value: u.id }))
+        const raw = Array.isArray(resp) ? resp : (resp.items || [])
+        options.value = raw.map((u: any) => ({ label: u.username || u.full_name || (`user-${u.id}`), value: u.id }))
       } finally {
         loading.value = false
       }

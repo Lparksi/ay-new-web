@@ -11,7 +11,7 @@
       </t-form-item>
 
       <t-form-item label="备注">
-        <t-input v-model:value="form.remarks" type="textarea" rows="4" style="width:480px" />
+        <t-textarea v-model:value="form.remarks" rows="4" style="width:480px" />
       </t-form-item>
 
       <t-form-item label="优先级">
@@ -49,7 +49,7 @@
 import { reactive } from 'vue'
 import { createTask } from '../api/task'
 import { ref } from 'vue'
-import { Form, FormItem, Input, Button, Select, InputNumber, DatePicker } from 'tdesign-vue-next'
+import { Form, FormItem, Input, Textarea, Button, Select, InputNumber, DatePicker } from 'tdesign-vue-next'
 import UserSelect from '../components/Selectors/UserSelect.vue'
 import MerchantSelect from '../components/Selectors/MerchantSelect.vue'
 import TagSelect from '../components/Selectors/TagSelect.vue'

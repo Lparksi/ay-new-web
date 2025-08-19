@@ -221,6 +221,8 @@ async function handleSubmit() {
     } else {
       await createTag(payload)
       MessagePlugin.success('创建标签成功')
+      // 新建后跳回第一页以确保能看到新建的数据
+      pagination.current = 1
     }
 
     showModal.value = false
@@ -252,11 +254,13 @@ async function handleBatchSubmit() {
       return
     }
 
-    await batchCreateTags(tagData)
-    MessagePlugin.success(`批量创建 ${tagData.length} 个标签成功`)
-    
-    showBatchModal.value = false
-    await loadTags()
+  await batchCreateTags(tagData)
+  MessagePlugin.success(`批量创建 ${tagData.length} 个标签成功`)
+  // 新建后跳回第一页以确保能看到新建的数据
+  pagination.current = 1
+
+  showBatchModal.value = false
+  await loadTags()
   } catch (error: any) {
     MessagePlugin.error('批量创建失败: ' + error.message)
   }

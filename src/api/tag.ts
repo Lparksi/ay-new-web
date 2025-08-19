@@ -15,8 +15,29 @@ export interface PagedResponse<T> {
 
 export async function fetchTags(params: TagListParams = {}): Promise<PagedResponse<Tag> | Tag[]> {
   try {
-    const resp = await http.get('/merchant-tags', { params })
-    return resp.data
+  const resp = await http.get('/merchant-tags', { params })
+    const d = resp.data
+    // backend may return several shapes: { items:[], total }, { code,msg,data:[...items] }, or direct array
+    let rawItems: any[] = []
+    if (d && Array.isArray(d.items)) rawItems = d.items
+    else if (d && Array.isArray(d.data?.items)) rawItems = d.data.items
+    else if (d && Array.isArray(d.data)) rawItems = d.data
+    else if (Array.isArray(d)) rawItems = d
+
+    // map backend fields to frontend shape
+    const items = rawItems.map((it: any) => ({
+      id: it.ID ?? it.id,
+      name: it.tag_name ?? it.name ?? it.alias ?? '',
+      color: it.color ?? it.class ?? '',
+      description: it.remarks ?? it.description ?? '',
+      created_at: it.CreatedAt ?? it.created_at,
+      updated_at: it.UpdatedAt ?? it.updated_at,
+      deleted_at: it.DeletedAt ?? it.deleted_at ?? null,
+      // keep original raw object if needed
+      _raw: it,
+    }))
+
+    return { items, total: items.length }
   } catch (e) {
     throw normalizeError(e)
   }
