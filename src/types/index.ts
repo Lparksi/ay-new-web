@@ -38,6 +38,12 @@ export interface Merchant {
   name: string
   phone?: string
   address?: string
+  city?: string          // 城市字段，用于地理编码
+  lng?: number          // 经度
+  lat?: number          // 纬度
+  geocode_level?: string          // 地理编码精度等级
+  geocode_score?: number          // 地理编码精度分数
+  geocode_description?: string    // 地理编码精度描述
   tags?: number[]
   created_at?: string
   updated_at?: string
