@@ -69,3 +69,75 @@ export interface Task {
   created_at?: string
   updated_at?: string
 }
+
+// 地理编码相关接口定义
+export interface GeocodeRequest {
+  address: string
+  city?: string
+}
+
+export interface GeocodeResponse {
+  lng: number
+  lat: number
+  level?: string
+  level_score?: number          // 级别分数，0-100，越高越精确
+  level_description?: string    // 精度描述：粗略定位、中等定位、精确定位、非常精确
+  province?: string
+  city?: string
+  district?: string
+  formatted_address?: string
+}
+
+export interface GeocodeBatchItem {
+  address: string
+  city?: string
+}
+
+export interface GeocodeBatchRequest {
+  items: GeocodeBatchItem[]
+}
+
+export interface GeocodeError {
+  code: string
+  message: string
+}
+
+export interface GeocodeBatchItemResult {
+  index: number
+  success: boolean
+  error?: GeocodeError
+  result?: GeocodeResponse
+}
+
+export interface GeocodeBatchResponse {
+  results: GeocodeBatchItemResult[]
+}
+
+// 地理编码精度等级枚举
+export enum GeocodeAccuracyLevel {
+  ROUGH = 'rough',        // 粗略定位 (0-20)
+  MEDIUM = 'medium',      // 中等定位 (25-50)
+  PRECISE = 'precise',    // 精确定位 (55-85)
+  VERY_PRECISE = 'very_precise'  // 非常精确 (85-100)
+}
+
+// 精度等级描述映射
+export const GEOCODE_ACCURACY_DESCRIPTIONS = {
+  [GeocodeAccuracyLevel.ROUGH]: '粗略定位',
+  [GeocodeAccuracyLevel.MEDIUM]: '中等定位', 
+  [GeocodeAccuracyLevel.PRECISE]: '精确定位',
+  [GeocodeAccuracyLevel.VERY_PRECISE]: '非常精确'
+} as const
+
+// 根据分数获取精度等级的工具函数
+export function getAccuracyLevel(score: number): GeocodeAccuracyLevel {
+  if (score <= 20) return GeocodeAccuracyLevel.ROUGH
+  if (score <= 50) return GeocodeAccuracyLevel.MEDIUM
+  if (score <= 85) return GeocodeAccuracyLevel.PRECISE
+  return GeocodeAccuracyLevel.VERY_PRECISE
+}
+
+// 根据分数获取精度描述的工具函数
+export function getAccuracyDescription(score: number): string {
+  return GEOCODE_ACCURACY_DESCRIPTIONS[getAccuracyLevel(score)]
+}

@@ -34,3 +34,9 @@ export function responseRejected(error: any) {
 // Register interceptors
 http.interceptors.request.use(requestFulfilled)
 http.interceptors.response.use((resp) => resp, responseRejected)
+
+// Export API modules
+export * from './auth'
+export * from './geocode'
+export { fetchUsers, fetchCurrentUser, createUser, updateUser, deleteUser, updatePassword } from './user'
+export { createTask, fetchTasks, fetchTasksPaged } from './task'
