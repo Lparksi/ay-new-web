@@ -7,7 +7,11 @@
     cancel-btn="关闭"
   >
     <div v-if="user" class="user-detail">
-      <t-descriptions :data="descriptions" />
+      <t-descriptions :items="descriptions" />
+    </div>
+    <div v-else class="no-user">
+      <p>用户数据为空</p>
+      <p>Debug: {{ JSON.stringify(props.user) }}</p>
     </div>
   </t-dialog>
 </template>
@@ -70,17 +74,18 @@ function formatPermissions(permissions?: any[]) {
 }
 
 const descriptions = computed(() => {
+  console.log('Computing descriptions for user:', props.user)
   if (!props.user) return []
   
   const user = props.user
-  return [
+  const result = [
     {
       label: 'ID',
-      content: user.id
+      content: String(user.id)
     },
     {
       label: '用户名',
-      content: user.username
+      content: user.username || '-'
     },
     {
       label: '姓名',
@@ -107,6 +112,8 @@ const descriptions = computed(() => {
       content: formatDate(user.updated_at)
     }
   ]
+  console.log('Computed descriptions:', result)
+  return result
 })
 </script>
 

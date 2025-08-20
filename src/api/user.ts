@@ -46,7 +46,12 @@ export async function fetchUsers(params: UserListParams = {}): Promise<PagedResp
 export async function fetchCurrentUser(): Promise<User> {
   try {
     const resp = await http.get('/users/me')
-    return resp.data as User
+    const userData = resp.data.data || resp.data
+    const mappedUser = mapUserBackendToFrontend(userData)
+    if (!mappedUser) {
+      throw new Error('Invalid user data received from server')
+    }
+    return mappedUser
   } catch (e) {
     throw normalizeError(e)
   }
@@ -73,6 +78,15 @@ export async function updateUser(id: number | string, payload: Partial<User>) {
 export async function deleteUser(id: number | string) {
   try {
     const resp = await http.delete(`/users/${id}`)
+    return resp.data
+  } catch (e) {
+    throw normalizeError(e)
+  }
+}
+
+export async function updatePassword(payload: { oldPassword: string; newPassword: string }) {
+  try {
+    const resp = await http.put('/users/me/password', payload)
     return resp.data
   } catch (e) {
     throw normalizeError(e)

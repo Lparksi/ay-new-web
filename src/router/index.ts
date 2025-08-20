@@ -8,6 +8,7 @@ const Login = () => import('../pages/Login.vue')
 const Users = () => import('../pages/Users.vue')
 const Merchants = () => import('../pages/Merchants.vue')
 const MerchantTags = () => import('../pages/MerchantTags.vue')
+const Profile = () => import('../pages/Profile.vue')
 
 const routes = [
   { 
@@ -32,6 +33,11 @@ const routes = [
   { 
     path: '/merchant-tags', 
     component: MerchantTags,
+    meta: { requiresAuth: true }
+  },
+  { 
+    path: '/profile', 
+    component: Profile,
     meta: { requiresAuth: true }
   },
   { 

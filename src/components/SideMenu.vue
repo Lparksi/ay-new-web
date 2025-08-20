@@ -8,6 +8,7 @@
     <t-menu-item value="users" :to="{ path: '/users' }">用户管理</t-menu-item>
     <t-menu-item value="merchants" :to="{ path: '/merchants' }">商家管理</t-menu-item>
     <t-menu-item value="merchant-tags" :to="{ path: '/merchant-tags' }">标签管理</t-menu-item>
+    <t-menu-item value="profile" :to="{ path: '/profile' }">个人资料</t-menu-item>
 
   </t-menu>
 </template>
