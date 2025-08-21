@@ -115,17 +115,23 @@ export const formValidationRules = {
 
   // 商家表单验证
   merchant: {
-    name: [
-      commonRules.required('请输入商家名称'),
-      commonRules.minLength(2, '商家名称至少2个字符'),
-      commonRules.maxLength(100, '商家名称最多100个字符')
+    legal_name: [
+      commonRules.required('请输入法人姓名'),
+      commonRules.minLength(2, '法人姓名至少2个字符'),
+      commonRules.maxLength(100, '法人姓名最多100个字符')
     ],
     phone: [
-      commonRules.required('请输入联系电话'),
+      // 电话号码不是必填的
       commonRules.phone()
     ],
     address: [
       commonRules.maxLength(200, '地址最多200个字符')
+    ],
+    city: [
+      commonRules.maxLength(50, '城市名称最多50个字符')
+    ],
+    area: [
+      commonRules.maxLength(50, '区域名称最多50个字符')
     ]
   },
 

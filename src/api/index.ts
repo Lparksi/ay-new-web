@@ -21,7 +21,7 @@ export function requestFulfilled(config: any) {
 // named response rejected handler for easier testing
 export function responseRejected(error: any) {
   const status = error?.response?.status
-  if (status === 401 || status === 403) {
+  if (status === 401) {
     try {
       localStorage.removeItem('AY_AUTH_TOKEN')
     } catch (e) {}

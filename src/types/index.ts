@@ -35,10 +35,11 @@ export interface User {
 
 export interface Merchant {
   id: number
-  name: string
-  phone?: string
+  legal_name: string    // 法人姓名，必填字段
+  phone?: string        // 联系电话，可选字段
   address?: string
-  city?: string          // 城市字段，用于地理编码
+  city?: string         // 城市字段，用于地理编码
+  area?: string         // 区域字段
   lng?: number          // 经度
   lat?: number          // 纬度
   geocode_level?: string          // 地理编码精度等级

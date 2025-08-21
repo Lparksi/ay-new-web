@@ -43,12 +43,12 @@
         :rules="formRules"
         label-width="100px"
       >
-        <t-form-item label="商家名称" name="name">
-          <t-input v-model:value="formData.name" placeholder="请输入商家名称" />
+        <t-form-item label="法人姓名" name="legal_name">
+          <t-input v-model:value="formData.legal_name" placeholder="请输入法人姓名" />
         </t-form-item>
         
         <t-form-item label="联系电话" name="phone">
-          <t-input v-model:value="formData.phone" placeholder="请输入联系电话" />
+          <t-input v-model:value="formData.phone" placeholder="请输入联系电话（可选）" />
         </t-form-item>
         
         <t-form-item label="城市" name="city">
@@ -127,10 +127,11 @@ const pagination = reactive({
 
 const formData = reactive({
   id: null as number | null,
-  name: '',
+  legal_name: '',
   phone: '',
   address: '',
   city: '安阳市', // 默认值
+  area: '',
   lng: null as number | null,
   lat: null as number | null,
   geocode_level: '',
@@ -143,7 +144,7 @@ const formRules = formValidationRules.merchant
 
 const columns = [
   { colKey: 'id', title: 'ID', width: 80 },
-  { colKey: 'name', title: '商家名称' },
+  { colKey: 'legal_name', title: '法人姓名' },
   { colKey: 'phone', title: '联系电话' },
   { colKey: 'address', title: '地址' },
   { 
@@ -196,10 +197,11 @@ function showCreateForm() {
 
 function editMerchant(merchant: Merchant) {
   formData.id = merchant.id
-  formData.name = merchant.name || ''
+  formData.legal_name = merchant.legal_name || ''
   formData.phone = merchant.phone || ''
   formData.address = merchant.address || ''
   formData.city = merchant.city || '安阳市'
+  formData.area = merchant.area || ''
   formData.lng = merchant.lng || null
   formData.lat = merchant.lat || null
   formData.geocode_level = merchant.geocode_level || ''
@@ -216,10 +218,11 @@ async function handleSubmit() {
     if (!valid) return
 
     const payload: Partial<Merchant> = {
-      name: formData.name,
+      legal_name: formData.legal_name,
       phone: formData.phone,
       address: formData.address,
       city: formData.city,
+      area: formData.area,
       tags: formData.tags,
     }
     
@@ -252,10 +255,11 @@ function handleCancel() {
 
 function resetForm() {
   formData.id = null
-  formData.name = ''
+  formData.legal_name = ''
   formData.phone = ''
   formData.address = ''
   formData.city = '安阳市'
+  formData.area = ''
   formData.lng = null
   formData.lat = null
   formData.geocode_level = ''
