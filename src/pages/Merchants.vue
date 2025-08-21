@@ -184,25 +184,54 @@
     <t-card class="table-card">
       <template #header>
         <div class="table-header">
-          <h3>商家列表</h3>
+          <div class="header-left">
+            <h3>商家列表</h3>
+            <!-- 选中状态提示 -->
+            <div v-if="hasSelectedMerchants" class="selection-info">
+              <t-tag theme="primary" variant="light" size="small">
+                已选中 {{ selectedRowKeys.length }} 个商家
+              </t-tag>
+              <t-button 
+                theme="default" 
+                variant="text" 
+                size="small" 
+                @click="clearSelection"
+              >
+                取消选择
+              </t-button>
+            </div>
+          </div>
           <t-space size="small">
+            <!-- 批量操作按钮 -->
+            <t-dropdown 
+              v-if="hasSelectedMerchants" 
+              trigger="click" 
+              placement="bottom-right"
+              :popup-props="{ attach: 'body' }"
+            >
+              <t-button theme="primary" variant="outline">
+                批量操作 ({{ selectedRowKeys.length }})
+                <template #suffix><chevron-down-icon /></template>
+              </t-button>
+              <template #dropdown>
+                <t-dropdown-menu>
+                  <t-dropdown-item @click="handleBatchExport">
+                    <template #prefixIcon><download-icon /></template>
+                    批量导出
+                  </t-dropdown-item>
+                  <t-dropdown-item @click="handleBatchDelete" theme="danger">
+                    <template #prefixIcon><delete-icon /></template>
+                    批量删除
+                  </t-dropdown-item>
+                </t-dropdown-menu>
+              </template>
+            </t-dropdown>
+            
             <t-tooltip content="刷新数据">
               <t-button variant="outline" @click="loadMerchants">
                 <template #icon><refresh-icon /></template>
               </t-button>
             </t-tooltip>
-            <t-dropdown>
-              <t-button variant="outline">
-                <template #icon><setting-icon /></template>
-                表格设置
-              </t-button>
-              <template #dropdown>
-                <t-dropdown-menu>
-                  <t-dropdown-item @click="handleTableSetting">列显示设置</t-dropdown-item>
-                  <t-dropdown-item @click="handleDensitySetting">表格密度</t-dropdown-item>
-                </t-dropdown-menu>
-              </template>
-            </t-dropdown>
           </t-space>
         </div>
       </template>
@@ -216,33 +245,44 @@
         :hover="true"
         :stripe="true"
         :bordered="true"
-        :size="tableSize"
         :max-height="600"
         resizable
+        :selected-row-keys="selectedRowKeys"
         @page-change="handlePageChange"
         @filter-change="handleFilterChange"
         @change="handleTableChange"
         @row-click="handleRowClick"
+        @select-change="handleSelectChange"
       >
         <template #actions="{ row }">
-          <t-space size="small">
-            <t-button theme="primary" variant="text" size="small" @click.stop="editMerchant(row)">
+          <t-space size="4px" direction="vertical" style="width: 100%;">
+            <t-button theme="primary" variant="outline" size="small" style="width: 100%;" @click.stop="editMerchant(row)">
               <template #icon><edit-icon /></template>
               编辑
             </t-button>
-            <t-button theme="danger" variant="text" size="small" @click.stop="deleteMerchant(row)">
+            <t-button theme="danger" variant="outline" size="small" style="width: 100%;" @click.stop="deleteMerchant(row)">
               <template #icon><delete-icon /></template>
               删除
             </t-button>
-            <t-dropdown>
-              <t-button variant="text" size="small" @click.stop>
-                <template #icon><more-icon /></template>
+            <t-dropdown trigger="click" placement="bottom-right" :popup-props="{ attach: 'body' }" style="width: 100%;">
+              <t-button theme="default" variant="outline" size="small" style="width: 100%;">
+                更多
+                <template #suffix><chevron-down-icon /></template>
               </t-button>
               <template #dropdown>
                 <t-dropdown-menu>
-                  <t-dropdown-item @click="viewMerchantDetail(row)">查看详情</t-dropdown-item>
-                  <t-dropdown-item @click="copyMerchantInfo(row)">复制信息</t-dropdown-item>
-                  <t-dropdown-item @click="exportSingle(row)">导出数据</t-dropdown-item>
+                  <t-dropdown-item @click="viewMerchantDetail(row)">
+                    <template #prefixIcon><info-circle-icon /></template>
+                    查看详情
+                  </t-dropdown-item>
+                  <t-dropdown-item @click="copyMerchantInfo(row)">
+                    <template #prefixIcon><copy-icon /></template>
+                    复制信息
+                  </t-dropdown-item>
+                  <t-dropdown-item @click="exportSingle(row)">
+                    <template #prefixIcon><download-icon /></template>
+                    导出数据
+                  </t-dropdown-item>
                 </t-dropdown-menu>
               </template>
             </t-dropdown>
@@ -285,7 +325,7 @@
         <t-divider>基本信息</t-divider>
         <t-row :gutter="16">
           <t-col :span="12">
-            <t-form-item label="法人姓名" name="legal_name" required>
+            <t-form-item label="法人姓名" name="legal_name" :required-mark="true">
               <t-input 
                 v-model="formData.legal_name" 
                 placeholder="请输入法人姓名"
@@ -297,7 +337,7 @@
             <t-form-item label="联系电话" name="phone">
               <t-input 
                 v-model="formData.phone" 
-                placeholder="请输入联系电话（可选）"
+                placeholder="请输入联系电话"
                 clearable
               />
             </t-form-item>
@@ -331,7 +371,7 @@
 
         <!-- 地址信息 -->
         <t-divider>地址信息</t-divider>
-        <t-form-item label="详细地址" name="address" required>
+        <t-form-item label="详细地址" name="address" :required-mark="true">
           <t-textarea 
             v-model="formData.address" 
             placeholder="请输入详细地址"
@@ -410,12 +450,11 @@ import { ref, onMounted, reactive, computed, watch } from 'vue'
 import { 
   Table, Button, Dialog, Form, FormItem, Input, MessagePlugin, Tag, Space, 
   Divider, Card, Alert, Select, Option, DateRangePicker, RangeInput, Text,
-  Row, Col, Textarea, Dropdown, DropdownMenu, DropdownItem,
-  Tooltip
+  Row, Col, Textarea, Tooltip, Dropdown, DropdownMenu, DropdownItem, DialogPlugin
 } from 'tdesign-vue-next'
 import { 
   AddIcon, LocationIcon, SearchIcon, RefreshIcon, ChevronDownIcon, ChevronUpIcon,
-  DownloadIcon, SettingIcon, EditIcon, DeleteIcon, MoreIcon, BrowseIcon
+  DownloadIcon, EditIcon, DeleteIcon, MoreIcon, BrowseIcon, InfoCircleIcon, CopyIcon
 } from 'tdesign-icons-vue-next'
 import TagSelect from '../components/Selectors/TagSelect.vue'
 import { fetchMerchants, createMerchant, updateMerchant, deleteMerchant as deleteMerchantApi } from '../api/merchant'
@@ -430,6 +469,7 @@ const submitting = ref(false)
 const showModal = ref(false)
 const isEditing = ref(false)
 const formRef = ref()
+const selectedRowKeys = ref<(string | number)[]>([])
 
 const pagination = reactive({
   current: 1,
@@ -512,9 +552,6 @@ const tagOptions = ref([
   { id: 6, name: '娱乐' },
 ])
 
-// 表格配置
-const tableSize = ref<'small' | 'medium' | 'large'>('medium')
-
 // 计算属性：有坐标的商家数量
 const merchantsWithCoordinates = computed(() => {
   return merchants.value.filter(m => m.lng && m.lat).length
@@ -533,6 +570,18 @@ const recentlyAdded = computed(() => {
   // 这里可以根据实际的创建时间字段来计算
   // 暂时返回固定值作为示例
   return 12
+})
+
+// 计算属性：是否有选中的商家
+const hasSelectedMerchants = computed(() => {
+  return selectedRowKeys.value.length > 0
+})
+
+// 计算属性：选中的商家数据
+const selectedMerchants = computed(() => {
+  return merchants.value.filter(merchant => 
+    selectedRowKeys.value.includes(merchant.id)
+  )
 })
 
 // 计算属性：是否有激活的筛选条件
@@ -582,12 +631,18 @@ const formRules = {
   ]
 }
 
+// 引用 TDesign Tag 组件用于表格渲染
+const TTag = Tag
+
 const columns = [
-  { colKey: 'id', title: 'ID', width: 80 },
+  {
+    colKey: 'row-select',
+    type: 'multiple',
+  },
+  { colKey: 'id', title: 'ID' },
   { 
     colKey: 'legal_name', 
     title: '法人姓名', 
-    width: 120,
     filter: {
       type: 'input' as const,
       props: {
@@ -599,7 +654,6 @@ const columns = [
   { 
     colKey: 'phone', 
     title: '联系电话', 
-    width: 130,
     filter: {
       type: 'input' as const,
       props: {
@@ -611,7 +665,6 @@ const columns = [
   { 
     colKey: 'address', 
     title: '详细地址', 
-    width: 200,
     filter: {
       type: 'input' as const,
       props: {
@@ -623,7 +676,6 @@ const columns = [
   { 
     colKey: 'city', 
     title: '城市', 
-    width: 100,
     filter: {
       type: 'input' as const,
       props: {
@@ -635,7 +687,6 @@ const columns = [
   { 
     colKey: 'area', 
     title: '商圈', 
-    width: 100,
     filter: {
       type: 'single' as const,
       list: [
@@ -649,7 +700,6 @@ const columns = [
   { 
     colKey: 'coordinates', 
     title: '经纬度', 
-    width: 180,
     filter: {
       type: 'single' as const,
       list: [
@@ -660,18 +710,30 @@ const columns = [
     },
     cell: (h: any, { row }: { row: Merchant }) => {
       if (row.lng && row.lat) {
-        return h('div', { class: 'coordinates-cell' }, [
+        const elements = [
           h('div', { class: 'coordinate-item' }, `经: ${row.lng.toFixed(4)}`),
-          h('div', { class: 'coordinate-item' }, `纬: ${row.lat.toFixed(4)}`),
-          row.geocode_description ? h('div', { 
-            class: `accuracy-badge accuracy-${getAccuracyTheme(row.geocode_score)}` 
-          }, row.geocode_description) : null
-        ])
+          h('div', { class: 'coordinate-item' }, `纬: ${row.lat.toFixed(4)}`)
+        ]
+        
+        if (row.geocode_description) {
+          elements.push(
+            h('div', { style: 'margin-top: 4px;' }, [
+              h(TTag, { 
+                theme: getAccuracyTheme(row.geocode_score),
+                variant: 'light',
+                size: 'small',
+                class: 'accuracy-tag'
+              }, () => row.geocode_description)
+            ])
+          )
+        }
+        
+        return h('div', { class: 'coordinates-cell' }, elements)
       }
       return h('span', { class: 'text-placeholder' }, '未设置')
     }
   },
-  { colKey: 'actions', title: '操作', width: 150 },
+  { colKey: 'actions', title: '操作' },
 ]
 
 async function loadMerchants() {
@@ -778,13 +840,28 @@ function resetForm() {
 }
 
 async function deleteMerchant(merchant: Merchant) {
-  try {
-    await deleteMerchantApi(merchant.id)
-    MessagePlugin.success('删除商家成功')
-    await loadMerchants()
-  } catch (error: any) {
-    handleError(error)
-  }
+  // 显示确认对话框
+  const dialog = DialogPlugin.confirm({
+    header: '确认删除',
+    body: `您确定要删除商家"${merchant.legal_name}"吗？此操作不可撤销。`,
+    theme: 'danger',
+    confirmBtn: '确定删除',
+    cancelBtn: '取消',
+    onConfirm: async ({ e }) => {
+      try {
+        await deleteMerchantApi(merchant.id)
+        MessagePlugin.success('删除商家成功')
+        await loadMerchants()
+        dialog.destroy() // 销毁对话框
+      } catch (error: any) {
+        handleError(error)
+        dialog.destroy() // 即使出错也要销毁对话框
+      }
+    },
+    onCancel: ({ e }) => {
+      dialog.destroy() // 取消时销毁对话框
+    }
+  })
 }
 
 // 地址转换为经纬度
@@ -817,7 +894,7 @@ async function convertAddressToCoordinates() {
 }
 
 // 根据精度分数获取主题颜色
-function getAccuracyTheme(score?: number | null): string {
+function getAccuracyTheme(score?: number | null): 'default' | 'primary' | 'success' | 'warning' | 'danger' {
   if (!score) return 'default'
   if (score <= 20) return 'danger'    // 粗略定位 - 红色
   if (score <= 50) return 'warning'   // 中等定位 - 橙色
@@ -846,6 +923,7 @@ function handleTableChange(data: any, context: any) {
 function handlePageChange(pageInfo: any) {
   pagination.current = pageInfo.current
   pagination.pageSize = pageInfo.pageSize
+  selectedRowKeys.value = [] // 分页时清空选中状态
   loadMerchants()
 }
 
@@ -853,6 +931,7 @@ function handlePageChange(pageInfo: any) {
 function handleSearch() {
   // 重置到第一页
   pagination.current = 1
+  selectedRowKeys.value = [] // 搜索时清空选中状态
   loadMerchants()
 }
 
@@ -868,6 +947,7 @@ function resetFilters() {
     geocodeLevel: '',
     scoreRange: null,
   })
+  selectedRowKeys.value = [] // 重置筛选时清空选中状态
   handleSearch()
 }
 
@@ -876,20 +956,60 @@ function handleExport() {
   MessagePlugin.info('导出功能开发中...')
 }
 
-// 表格设置
-function handleTableSetting() {
-  MessagePlugin.info('列显示设置功能开发中...')
+// 多选相关函数
+function handleSelectChange(selectedKeys: (string | number)[], options: any) {
+  selectedRowKeys.value = selectedKeys
+  console.log('Selected rows:', selectedKeys, options)
 }
 
-function handleDensitySetting() {
-  if (tableSize.value === 'small') {
-    tableSize.value = 'medium'
-  } else if (tableSize.value === 'medium') {
-    tableSize.value = 'large'
-  } else {
-    tableSize.value = 'small'
+// 清空选择
+function clearSelection() {
+  selectedRowKeys.value = []
+  MessagePlugin.success('已清空选择')
+}
+
+// 批量导出
+function handleBatchExport() {
+  if (selectedMerchants.value.length === 0) {
+    MessagePlugin.warning('请先选择要导出的商家')
+    return
   }
-  MessagePlugin.success(`表格密度已调整为${tableSize.value}`)
+  MessagePlugin.info(`批量导出 ${selectedMerchants.value.length} 个商家数据`)
+  // TODO: 实现批量导出逻辑
+}
+
+// 批量删除
+async function handleBatchDelete() {
+  if (selectedMerchants.value.length === 0) {
+    MessagePlugin.warning('请先选择要删除的商家')
+    return
+  }
+  
+  // 显示确认对话框
+  const dialog = DialogPlugin.confirm({
+    header: '确认批量删除',
+    body: `您确定要删除所选的 ${selectedMerchants.value.length} 个商家吗？此操作不可撤销。`,
+    theme: 'danger',
+    confirmBtn: '确定删除',
+    cancelBtn: '取消',
+    onConfirm: async ({ e }) => {
+      try {
+        // 这里应该调用批量删除API
+        // await batchDeleteMerchants(selectedRowKeys.value)
+        
+        MessagePlugin.success(`批量删除 ${selectedMerchants.value.length} 个商家成功`)
+        selectedRowKeys.value = [] // 清空选中状态
+        await loadMerchants() // 重新加载数据
+        dialog.destroy() // 销毁对话框
+      } catch (error: any) {
+        handleError(error)
+        dialog.destroy() // 即使出错也要销毁对话框
+      }
+    },
+    onCancel: ({ e }) => {
+      dialog.destroy() // 取消时销毁对话框
+    }
+  })
 }
 
 // 行点击处理
@@ -1050,6 +1170,13 @@ onMounted(() => {
   margin: 0;
 }
 
+.header-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
 .table-header h3 {
   font-size: 16px;
   font-weight: 600;
@@ -1057,11 +1184,18 @@ onMounted(() => {
   margin: 0;
 }
 
+.selection-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 /* 表格内容样式 */
 .coordinates-cell {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
+  align-items: flex-start;
 }
 
 .coordinate-item {
@@ -1070,37 +1204,10 @@ onMounted(() => {
   font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
 }
 
-.accuracy-badge {
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 12px;
-  margin-top: 2px;
+.accuracy-tag {
+  margin-top: 4px;
   font-weight: 500;
-  text-align: center;
-}
-
-.accuracy-danger {
-  background: #fef2f2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
-}
-
-.accuracy-warning {
-  background: #fffbeb;
-  color: #d97706;
-  border: 1px solid #fed7aa;
-}
-
-.accuracy-success {
-  background: #f0fdf4;
-  color: #16a34a;
-  border: 1px solid #bbf7d0;
-}
-
-.accuracy-primary {
-  background: #eff6ff;
-  color: #2563eb;
-  border: 1px solid #dbeafe;
+  border-radius: 12px;
 }
 
 .text-placeholder {
@@ -1148,6 +1255,8 @@ onMounted(() => {
 
 :deep(.t-table) {
   border-radius: 6px;
+  table-layout: auto; /* 启用自动列宽 */
+  width: 100%;
 }
 
 :deep(.t-table__header) {
@@ -1158,6 +1267,7 @@ onMounted(() => {
   font-weight: 600;
   color: #374151;
   border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap; /* 防止表头文字换行 */
 }
 
 :deep(.t-table__body tr:hover) {
@@ -1166,6 +1276,51 @@ onMounted(() => {
 
 :deep(.t-table__body td) {
   border-bottom: 1px solid #f3f4f6;
+}
+
+/* 特定列的样式优化 */
+:deep(.t-table__body td:first-child) {
+  width: 1%; /* 选择列最小宽度 */
+}
+
+:deep(.t-table__body td:nth-child(2)) {
+  width: 1%; /* ID列最小宽度 */
+  white-space: nowrap;
+}
+
+:deep(.t-table__body td:nth-child(3)) {
+  width: 10%; /* 法人姓名列 */
+  white-space: nowrap;
+}
+
+:deep(.t-table__body td:nth-child(4)) {
+  width: 12%; /* 联系电话列 */
+  white-space: nowrap;
+}
+
+:deep(.t-table__body td:nth-child(5)) {
+  width: 25%; /* 详细地址列 - 重新增加一些空间 */
+  word-break: break-word;
+  max-width: 200px;
+}
+
+:deep(.t-table__body td:nth-child(6)) {
+  width: 8%; /* 城市列 */
+  white-space: nowrap;
+}
+
+:deep(.t-table__body td:nth-child(7)) {
+  width: 10%; /* 商圈列 - 恢复一些空间 */
+  white-space: nowrap;
+}
+
+:deep(.t-table__body td:nth-child(8)) {
+  width: 15%; /* 经纬度列 - 恢复一些空间 */
+}
+
+:deep(.t-table__body td:last-child) {
+  width: 20%; /* 操作列减少宽度，因为竖向排列更紧凑 */
+  white-space: nowrap;
 }
 
 :deep(.t-pagination) {
@@ -1219,6 +1374,94 @@ onMounted(() => {
   font-weight: 500;
 }
 
+/* 表格操作按钮样式 */
+:deep(.t-table .t-space) {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  gap: 4px;
+}
+
+:deep(.t-table .t-button--size-small) {
+  min-width: auto;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  width: 100%;
+  justify-content: center;
+}
+
+:deep(.t-table .t-button--variant-outline) {
+  border-width: 1px;
+  transition: all 0.2s ease;
+}
+
+:deep(.t-table .t-button--theme-primary.t-button--variant-outline) {
+  color: #3b82f6;
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.05);
+}
+
+:deep(.t-table .t-button--theme-primary.t-button--variant-outline:hover) {
+  background: #3b82f6;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+:deep(.t-table .t-button--theme-danger.t-button--variant-outline) {
+  color: #ef4444;
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+:deep(.t-table .t-button--theme-danger.t-button--variant-outline:hover) {
+  background: #ef4444;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+}
+
+:deep(.t-table .t-button--theme-default.t-button--variant-outline) {
+  color: #6b7280;
+  border-color: #d1d5db;
+  background: rgba(107, 114, 128, 0.05);
+}
+
+:deep(.t-table .t-button--theme-default.t-button--variant-outline:hover) {
+  background: #6b7280;
+  color: white;
+  border-color: #6b7280;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(107, 114, 128, 0.2);
+}
+
+/* 操作按钮图标样式 */
+:deep(.t-table .t-button .t-icon) {
+  font-size: 14px;
+  margin-right: 4px;
+}
+
+/* 下拉菜单样式 */
+:deep(.t-dropdown) {
+  display: inline-block;
+}
+
+:deep(.t-dropdown-menu) {
+  min-width: 120px;
+}
+
+:deep(.t-dropdown-item) {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+:deep(.t-dropdown-item:hover) {
+  background: #f3f4f6;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .merchants-page {
@@ -1247,6 +1490,25 @@ onMounted(() => {
   .stats-row :deep(.t-col) {
     margin-bottom: 16px;
   }
+  
+  /* 中等屏幕下的操作列优化 */
+  :deep(.t-table .t-space) {
+    gap: 3px !important;
+  }
+  
+  :deep(.t-table .t-button--size-small) {
+    padding: 3px 6px;
+    font-size: 11px;
+  }
+  
+  /* 中等屏幕下的列宽调整 */
+  :deep(.t-table__body td:nth-child(5)) {
+    max-width: 150px; /* 地址列在中等屏幕适当缩小 */
+  }
+  
+  :deep(.t-table__body td:last-child) {
+    width: 25%; /* 操作列在中等屏幕稍微增加空间 */
+  }
 }
 
 @media (max-width: 480px) {
@@ -1260,6 +1522,36 @@ onMounted(() => {
   
   :deep(.t-table) {
     font-size: 12px;
+  }
+  
+  /* 移动端列宽调整 */
+  :deep(.t-table__body td:nth-child(5)) {
+    max-width: 120px; /* 地址列在移动端缩小 */
+  }
+  
+  :deep(.t-table__body td:nth-child(8)) {
+    width: 12%; /* 经纬度列在移动端缩小 */
+  }
+  
+  :deep(.t-table__body td:last-child) {
+    width: 30%; /* 操作列在移动端保持合适空间 */
+  }
+  
+  /* 表格操作列优化 */
+  :deep(.t-table .t-space) {
+    gap: 3px !important;
+  }
+  
+  :deep(.t-table .t-button--size-small) {
+    padding: 3px 6px;
+    font-size: 11px;
+    width: 100%;
+    justify-content: center;
+  }
+  
+  /* 下拉菜单在移动端优化 */
+  :deep(.t-table .t-dropdown) {
+    width: 100%;
   }
 }
 </style>
