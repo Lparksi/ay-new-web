@@ -34,10 +34,11 @@ async function onLogin() {
   try {
     const r = await auth.login(form.username, form.password)
     if (auth.isAuthenticated()) {
+      notifySuccess('登录成功！')
       const redirect = (route.query.redirect as string) || '/'
       router.replace(redirect)
     } else {
-      notifySuccess('登录成功，但未返回 token')
+      notifyError('登录失败，未返回有效的认证信息')
     }
   } catch (err: any) {
     notifyError('登录失败: ' + (err?.response?.data?.message || err.message))

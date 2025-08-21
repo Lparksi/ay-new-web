@@ -26,6 +26,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { notifySuccess } from '../utils/notification'
 import { Button, Space, Avatar, Dropdown, Icon } from 'tdesign-vue-next'
 
 const router = useRouter()
@@ -58,12 +59,13 @@ function handleUserMenuClick(data: any) {
 
 function onLogout() {
   auth.logout()
+  notifySuccess('已成功退出登录')
   router.push('/login')
 }
 </script>
 
 <style scoped>
-.navbar {
+.navbar-header {
   height: 56px;
   display: flex;
   align-items: center;
@@ -73,14 +75,16 @@ function onLogout() {
   border-bottom: 1px solid #eee;
 }
 
-.navbar-brand {
+.brand {
   font-weight: 600;
   font-size: 18px;
+  color: #0052d9;
 }
 
-.navbar-nav {
+.header-ops {
   display: flex;
-  gap: 24px;
+  align-items: center;
+  gap: 12px;
 }
 
 .nav-link {
@@ -99,12 +103,6 @@ function onLogout() {
 .nav-link.router-link-active {
   color: #0052d9;
   background: #e7f3ff;
-}
-
-.navbar-user {
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 
 .username {

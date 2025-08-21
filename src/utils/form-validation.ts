@@ -6,7 +6,8 @@ export interface ValidationRule {
   required?: boolean
   message?: string
   validator?: (value: any) => boolean | string
-  trigger?: 'blur' | 'change'
+  trigger?: 'blur' | 'change' | 'submit'
+  type?: 'error' | 'warning'
 }
 
 export interface ValidationRules {
@@ -18,7 +19,7 @@ export const commonRules = {
   required: (message = '此字段为必填项'): ValidationRule => ({
     required: true,
     message,
-    trigger: 'blur'
+    trigger: 'change'
   }),
 
   minLength: (min: number, message?: string): ValidationRule => ({
@@ -28,7 +29,7 @@ export const commonRules = {
       }
       return true
     },
-    trigger: 'blur'
+    trigger: 'change'
   }),
 
   maxLength: (max: number, message?: string): ValidationRule => ({
@@ -116,22 +117,66 @@ export const formValidationRules = {
   // 商家表单验证
   merchant: {
     legal_name: [
-      commonRules.required('请输入法人姓名'),
-      commonRules.minLength(2, '法人姓名至少2个字符'),
-      commonRules.maxLength(100, '法人姓名最多100个字符')
+      {
+        required: true,
+        message: '请输入法人姓名',
+        trigger: 'change'
+      },
+      {
+        validator: (value: string) => {
+          if (value && value.trim().length < 2) {
+            return '法人姓名至少2个字符'
+          }
+          if (value && value.length > 100) {
+            return '法人姓名最多100个字符'
+          }
+          return true
+        },
+        trigger: 'change'
+      }
     ],
     phone: [
-      // 电话号码不是必填的
-      commonRules.phone()
+      {
+        validator: (value: string) => {
+          if (!value) return true
+          const phoneRegex = /^1[3-9]\d{9}$/
+          return phoneRegex.test(value) || '请输入有效的手机号码'
+        },
+        trigger: 'blur'
+      }
     ],
     address: [
-      commonRules.maxLength(200, '地址最多200个字符')
+      {
+        validator: (value: string) => {
+          if (value && value.length > 200) {
+            return '地址最多200个字符'
+          }
+          return true
+        },
+        trigger: 'change'
+      }
     ],
     city: [
-      commonRules.maxLength(50, '城市名称最多50个字符')
+      {
+        validator: (value: string) => {
+          if (value && value.length > 50) {
+            return '城市名称最多50个字符'
+          }
+          return true
+        },
+        trigger: 'change'
+      }
     ],
     area: [
-      commonRules.maxLength(50, '区域名称最多50个字符')
+      {
+        validator: (value: string) => {
+          if (value && value.length > 50) {
+            return '区域名称最多50个字符'
+          }
+          return true
+        },
+        trigger: 'change'
+      }
     ]
   },
 

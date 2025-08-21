@@ -17,9 +17,16 @@ export function mapTagBackendToFrontend(it: any) {
 export function mapMerchantBackendToFrontend(it: any) {
   return {
     id: it.ID ?? it.id,
-    name: it.name ?? it.merchant_name ?? it.alias ?? '',
+    legal_name: it.legal_name ?? it.LegalName ?? '',
     phone: it.phone ?? it.Phone ?? '',
-    address: it.address ?? it.Address ?? it.location ?? '',
+    address: it.address ?? it.Address ?? '',
+    city: it.city ?? it.City ?? '',
+    area: it.area ?? it.Area ?? '',
+    lng: it.lng ?? it.Lng ?? null,
+    lat: it.lat ?? it.Lat ?? null,
+    geocode_level: it.geocode_level ?? it.GeocodeLevel ?? '',
+    geocode_score: it.geocode_score ?? it.GeocodeScore ?? null,
+    geocode_description: it.geocode_description ?? it.GeocodeDescription ?? '',
     tags: it.tags ?? it.TagIDs ?? it.tag_ids ?? [],
     created_at: it.CreatedAt ?? it.created_at,
     updated_at: it.UpdatedAt ?? it.updated_at,

@@ -1,100 +1,404 @@
 <template>
   <div class="merchants-page">
-    <div class="page-header">
-      <h2>商家管理</h2>
-      <t-button theme="primary" @click="showCreateForm">
-        <template #icon><add-icon /></template>
-        新建商家
-      </t-button>
-    </div>
+    <!-- 页面头部 -->
+    <t-card :bordered="false" class="page-header-card">
+      <div class="page-header">
+        <div class="header-left">
+          <h1 class="page-title">商家管理</h1>
+          <p class="page-description">管理和维护商家信息，支持批量操作和数据导出</p>
+        </div>
+        <div class="header-actions">
+          <t-space size="small">
+            <t-button variant="outline" @click="handleExport">
+              <template #icon><download-icon /></template>
+              导出数据
+            </t-button>
+            <t-button theme="primary" @click="showCreateForm">
+              <template #icon><add-icon /></template>
+              新建商家
+            </t-button>
+          </t-space>
+        </div>
+      </div>
+    </t-card>
 
-    <!-- Merchant List -->
-    <div class="merchant-list">
+    <!-- 搜索和筛选区域 -->
+    <t-card class="filter-card">
+      <div class="filter-section">
+        <div class="basic-filters">
+          <t-space size="medium" break-line>
+            <t-input 
+              v-model="searchParams.keyword"
+              placeholder="搜索商家名称、电话、地址"
+              clearable
+              style="width: 280px;"
+              @change="handleSearch"
+            >
+              <template #prefix-icon>
+                <search-icon />
+              </template>
+            </t-input>
+            
+            <t-select 
+              v-model="searchParams.city"
+              placeholder="选择城市"
+              clearable
+              style="width: 120px;"
+              @change="handleSearch"
+            >
+              <t-option
+                v-for="city in cityOptions"
+                :key="city.value"
+                :value="city.value"
+                :label="city.label"
+              />
+            </t-select>
+            
+            <t-select 
+              v-model="searchParams.area"
+              placeholder="选择商圈"
+              clearable
+              style="width: 120px;"
+              :disabled="!searchParams.city"
+              @change="handleSearch"
+            >
+              <t-option
+                v-for="area in areaOptions"
+                :key="area.value"
+                :value="area.value"
+                :label="area.label"
+              />
+            </t-select>
+
+            <t-button 
+              variant="outline"
+              @click="showAdvancedFilter = !showAdvancedFilter"
+            >
+              <template #icon>
+                <component :is="showAdvancedFilter ? ChevronUpIcon : ChevronDownIcon" />
+              </template>
+              {{ showAdvancedFilter ? '收起筛选' : '高级筛选' }}
+            </t-button>
+
+            <t-button variant="text" @click="resetFilters" v-if="hasActiveFilters">
+              <template #icon><refresh-icon /></template>
+              重置
+            </t-button>
+          </t-space>
+        </div>
+
+        <!-- 高级筛选区域 -->
+        <div v-show="showAdvancedFilter" class="advanced-filters">
+          <t-divider>高级筛选</t-divider>
+          <t-row :gutter="[16, 16]">
+            <t-col :span="6">
+              <t-form-item label="标签筛选">
+                <tag-select 
+                  v-model="searchParams.tags" 
+                  multiple
+                  placeholder="选择标签"
+                  @change="handleSearch"
+                />
+              </t-form-item>
+            </t-col>
+            <t-col :span="6">
+              <t-form-item label="坐标状态">
+                <t-select 
+                  v-model="searchParams.hasCoordinates"
+                  placeholder="坐标状态"
+                  clearable
+                  @change="handleSearch"
+                >
+                  <t-option value="has_coordinates" label="有坐标" />
+                  <t-option value="no_coordinates" label="无坐标" />
+                </t-select>
+              </t-form-item>
+            </t-col>
+            <t-col :span="6">
+              <t-form-item label="精度等级">
+                <t-select 
+                  v-model="searchParams.geocodeLevel"
+                  placeholder="选择精度"
+                  clearable
+                  @change="handleSearch"
+                >
+                  <t-option value="ROOFTOP" label="精确到建筑物" />
+                  <t-option value="RANGE_INTERPOLATED" label="精确到门牌号段" />
+                  <t-option value="GEOMETRIC_CENTER" label="精确到地标中心点" />
+                  <t-option value="APPROXIMATE" label="大概位置" />
+                </t-select>
+              </t-form-item>
+            </t-col>
+            <t-col :span="6">
+              <t-form-item label="创建时间">
+                <t-date-range-picker 
+                  v-model="searchParams.dateRange"
+                  placeholder="选择时间范围"
+                  format="YYYY-MM-DD"
+                  @change="handleSearch"
+                />
+              </t-form-item>
+            </t-col>
+          </t-row>
+        </div>
+      </div>
+    </t-card>
+
+    <!-- 数据统计卡片 -->
+    <t-row :gutter="16" class="stats-row">
+      <t-col :span="6">
+        <t-card class="stat-card">
+          <div class="stat-content">
+            <div class="stat-number">{{ merchants.length }}</div>
+            <div class="stat-label">总商家数</div>
+          </div>
+        </t-card>
+      </t-col>
+      <t-col :span="6">
+        <t-card class="stat-card">
+          <div class="stat-content">
+            <div class="stat-number">{{ merchantsWithCoordinates }}</div>
+            <div class="stat-label">有坐标商家</div>
+          </div>
+        </t-card>
+      </t-col>
+      <t-col :span="6">
+        <t-card class="stat-card">
+          <div class="stat-content">
+            <div class="stat-number">{{ averageAccuracy.toFixed(1) }}%</div>
+            <div class="stat-label">平均定位精度</div>
+          </div>
+        </t-card>
+      </t-col>
+      <t-col :span="6">
+        <t-card class="stat-card">
+          <div class="stat-content">
+            <div class="stat-number">{{ recentlyAdded }}</div>
+            <div class="stat-label">本月新增</div>
+          </div>
+        </t-card>
+      </t-col>
+    </t-row>
+
+    <!-- 商家列表 -->
+    <t-card class="table-card">
+      <template #header>
+        <div class="table-header">
+          <h3>商家列表</h3>
+          <t-space size="small">
+            <t-tooltip content="刷新数据">
+              <t-button variant="outline" @click="loadMerchants">
+                <template #icon><refresh-icon /></template>
+              </t-button>
+            </t-tooltip>
+            <t-dropdown>
+              <t-button variant="outline">
+                <template #icon><setting-icon /></template>
+                表格设置
+              </t-button>
+              <template #dropdown>
+                <t-dropdown-menu>
+                  <t-dropdown-item @click="handleTableSetting">列显示设置</t-dropdown-item>
+                  <t-dropdown-item @click="handleDensitySetting">表格密度</t-dropdown-item>
+                </t-dropdown-menu>
+              </template>
+            </t-dropdown>
+          </t-space>
+        </div>
+      </template>
+
       <t-table
         :data="merchants"
         :columns="columns"
         row-key="id"
         :loading="loading"
         :pagination="pagination"
+        :hover="true"
+        :stripe="true"
+        :bordered="true"
+        :size="tableSize"
+        :max-height="600"
+        resizable
         @page-change="handlePageChange"
+        @filter-change="handleFilterChange"
+        @change="handleTableChange"
+        @row-click="handleRowClick"
       >
         <template #actions="{ row }">
-          <t-button theme="primary" variant="text" @click="editMerchant(row)">
-            编辑
-          </t-button>
-          <t-button theme="danger" variant="text" @click="deleteMerchant(row)">
-            删除
-          </t-button>
+          <t-space size="small">
+            <t-button theme="primary" variant="text" size="small" @click.stop="editMerchant(row)">
+              <template #icon><edit-icon /></template>
+              编辑
+            </t-button>
+            <t-button theme="danger" variant="text" size="small" @click.stop="deleteMerchant(row)">
+              <template #icon><delete-icon /></template>
+              删除
+            </t-button>
+            <t-dropdown>
+              <t-button variant="text" size="small" @click.stop>
+                <template #icon><more-icon /></template>
+              </t-button>
+              <template #dropdown>
+                <t-dropdown-menu>
+                  <t-dropdown-item @click="viewMerchantDetail(row)">查看详情</t-dropdown-item>
+                  <t-dropdown-item @click="copyMerchantInfo(row)">复制信息</t-dropdown-item>
+                  <t-dropdown-item @click="exportSingle(row)">导出数据</t-dropdown-item>
+                </t-dropdown-menu>
+              </template>
+            </t-dropdown>
+          </t-space>
+        </template>
+
+        <!-- 空状态 -->
+        <template #empty>
+          <div class="empty-state">
+            <browse-icon class="empty-icon" />
+            <div class="empty-text">暂无商家数据</div>
+            <t-button theme="primary" @click="showCreateForm">
+              立即创建商家
+            </t-button>
+          </div>
         </template>
       </t-table>
-    </div>
+    </t-card>
 
     <!-- Create/Edit Modal -->
     <t-dialog
       v-model:visible="showModal"
-      :title="isEditing ? '编辑商家' : '新建商家'"
+      :title="isEditing ? '编辑商户' : '创建商户'"
       width="600px"
+      placement="center"
+      :confirm-loading="submitting"
       @confirm="handleSubmit"
       @cancel="handleCancel"
+      :confirm-on-enter="true"
     >
       <t-form
         ref="formRef"
-        :model="formData"
+        :data="formData"
         :rules="formRules"
         label-width="100px"
+        :colon="true"
+        :required-mark="false"
       >
-        <t-form-item label="法人姓名" name="legal_name">
-          <t-input v-model:value="formData.legal_name" placeholder="请输入法人姓名" />
+        <!-- 基本信息 -->
+        <t-divider>基本信息</t-divider>
+        <t-row :gutter="16">
+          <t-col :span="12">
+            <t-form-item label="法人姓名" name="legal_name" required>
+              <t-input 
+                v-model="formData.legal_name" 
+                placeholder="请输入法人姓名"
+                clearable
+              />
+            </t-form-item>
+          </t-col>
+          <t-col :span="12">
+            <t-form-item label="联系电话" name="phone">
+              <t-input 
+                v-model="formData.phone" 
+                placeholder="请输入联系电话（可选）"
+                clearable
+              />
+            </t-form-item>
+          </t-col>
+        </t-row>
+
+        <t-row :gutter="16">
+          <t-col :span="12">
+            <t-form-item label="城市" name="city">
+              <t-input 
+                v-model="formData.city" 
+                placeholder="请输入城市"
+                clearable
+              />
+            </t-form-item>
+          </t-col>
+          <t-col :span="12">
+            <t-form-item label="商圈" name="area">
+              <t-select 
+                v-model="formData.area" 
+                placeholder="请选择商圈类型"
+                clearable
+              >
+                <t-option value="居民区" label="居民区" />
+                <t-option value="商业（集贸）区" label="商业（集贸）区" />
+                <t-option value="其他" label="其他" />
+              </t-select>
+            </t-form-item>
+          </t-col>
+        </t-row>
+
+        <!-- 地址信息 -->
+        <t-divider>地址信息</t-divider>
+        <t-form-item label="详细地址" name="address" required>
+          <t-textarea 
+            v-model="formData.address" 
+            placeholder="请输入详细地址"
+            :maxlength="200"
+            :autosize="{ minRows: 2, maxRows: 4 }"
+          />
+          <template #help>
+            <t-space size="8px" style="margin-top: 8px;">
+              <t-button 
+                theme="primary" 
+                variant="outline"
+                size="small"
+                :loading="geocoding"
+                :disabled="!formData.address?.trim()"
+                @click="convertAddressToCoordinates"
+              >
+                <template #icon v-if="!geocoding">
+                  <location-icon />
+                </template>
+                {{ geocoding ? '转换中...' : '获取坐标' }}
+              </t-button>
+              <t-text theme="placeholder" variant="small">
+                经纬度为可选项，可根据地址自动获取坐标
+              </t-text>
+            </t-space>
+          </template>
         </t-form-item>
-        
-        <t-form-item label="联系电话" name="phone">
-          <t-input v-model:value="formData.phone" placeholder="请输入联系电话（可选）" />
+
+        <!-- 坐标信息 -->
+        <t-form-item 
+          v-if="formData.lng && formData.lat"
+          label="坐标信息" 
+          name="coordinates"
+        >
+          <t-card variant="outline" size="small">
+            <t-space direction="vertical" size="4px">
+              <t-space size="12px">
+                <t-tag theme="primary" variant="light" size="small">
+                  经度: {{ formData.lng.toFixed(6) }}
+                </t-tag>
+                <t-tag theme="primary" variant="light" size="small">
+                  纬度: {{ formData.lat.toFixed(6) }}
+                </t-tag>
+              </t-space>
+              <t-space size="8px" v-if="formData.geocode_description">
+                <t-text theme="placeholder" variant="small">精度等级:</t-text>
+                <t-tag 
+                  :theme="getAccuracyTheme(formData.geocode_score)" 
+                  variant="light"
+                  size="small"
+                >
+                  {{ formData.geocode_description }}
+                </t-tag>
+              </t-space>
+            </t-space>
+          </t-card>
         </t-form-item>
-        
-        <t-form-item label="城市" name="city">
-          <t-input v-model:value="formData.city" placeholder="请输入城市（默认：安阳市）" />
-        </t-form-item>
-        
-        <t-form-item label="地址" name="address">
-          <div class="address-input-group">
-            <t-input 
-              v-model:value="formData.address" 
-              placeholder="请输入详细地址" 
-              style="flex: 1;"
-            />
-            <t-button 
-              theme="primary" 
-              variant="outline"
-              :loading="geocoding"
-              @click="convertAddressToCoordinates"
-              style="margin-left: 8px;"
-            >
-              {{ geocoding ? '转换中...' : '转换为经纬度' }}
-            </t-button>
-          </div>
-        </t-form-item>
-        
-        <t-form-item label="经纬度" name="coordinates" v-if="formData.lng && formData.lat">
-          <div class="coordinates-display">
-            <t-tag theme="success" variant="light">
-              经度: {{ formData.lng.toFixed(6) }}
-            </t-tag>
-            <t-tag theme="success" variant="light" style="margin-left: 8px;">
-              纬度: {{ formData.lat.toFixed(6) }}
-            </t-tag>
-            <t-tag 
-              :theme="getAccuracyTheme(formData.geocode_score)" 
-              variant="light" 
-              style="margin-left: 8px;"
-              v-if="formData.geocode_description"
-            >
-              {{ formData.geocode_description }}
-            </t-tag>
-          </div>
-        </t-form-item>
-        
+
+        <!-- 标签信息 -->
+        <t-divider>标签信息</t-divider>
         <t-form-item label="关联标签" name="tags">
           <tag-select v-model="formData.tags" />
+          <template #help>
+            <t-text theme="placeholder" variant="small">
+              可选择多个标签对商户进行分类
+            </t-text>
+          </template>
         </t-form-item>
       </t-form>
     </t-dialog>
@@ -102,19 +406,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive } from 'vue'
-import { Table, Button, Dialog, Form, FormItem, Input, MessagePlugin, Tag } from 'tdesign-vue-next'
-import { AddIcon } from 'tdesign-icons-vue-next'
+import { ref, onMounted, reactive, computed, watch } from 'vue'
+import { 
+  Table, Button, Dialog, Form, FormItem, Input, MessagePlugin, Tag, Space, 
+  Divider, Card, Alert, Select, Option, DateRangePicker, RangeInput, Text,
+  Row, Col, Textarea, Dropdown, DropdownMenu, DropdownItem,
+  Tooltip
+} from 'tdesign-vue-next'
+import { 
+  AddIcon, LocationIcon, SearchIcon, RefreshIcon, ChevronDownIcon, ChevronUpIcon,
+  DownloadIcon, SettingIcon, EditIcon, DeleteIcon, MoreIcon, BrowseIcon
+} from 'tdesign-icons-vue-next'
 import TagSelect from '../components/Selectors/TagSelect.vue'
 import { fetchMerchants, createMerchant, updateMerchant, deleteMerchant as deleteMerchantApi } from '../api/merchant'
 import { geocode } from '../api/geocode'
 import type { Merchant } from '../types'
-import { formValidationRules } from '../utils/form-validation'
 import { handleError } from '../utils/error-handler'
 
 const merchants = ref<Merchant[]>([])
 const loading = ref(false)
 const geocoding = ref(false)
+const submitting = ref(false)
 const showModal = ref(false)
 const isEditing = ref(false)
 const formRef = ref()
@@ -140,17 +452,212 @@ const formData = reactive({
   tags: [] as number[],
 })
 
-const formRules = formValidationRules.merchant
+// 搜索参数
+const searchParams = reactive({
+  keyword: '',
+  city: '',
+  area: '',
+  tags: [] as number[],
+  hasCoordinates: '',
+  dateRange: null as [string, string] | null,
+  geocodeLevel: '',
+  scoreRange: null as [number, number] | null,
+})
+
+// 搜索相关状态
+const showAdvancedFilter = ref(false)
+
+// 选项数据
+const cityOptions = ref([
+  { label: '安阳市', value: '安阳市' },
+  { label: '郑州市', value: '郑州市' },
+  { label: '洛阳市', value: '洛阳市' },
+  { label: '开封市', value: '开封市' },
+  { label: '南阳市', value: '南阳市' },
+  { label: '许昌市', value: '许昌市' },
+])
+
+const areaOptions = computed(() => {
+  if (!searchParams.city) return []
+  
+  // 根据城市返回对应的区域选项
+  const areaMap: Record<string, Array<{label: string, value: string}>> = {
+    '安阳市': [
+      { label: '文峰区', value: '文峰区' },
+      { label: '北关区', value: '北关区' },
+      { label: '殷都区', value: '殷都区' },
+      { label: '龙安区', value: '龙安区' },
+      { label: '安阳县', value: '安阳县' },
+      { label: '林州市', value: '林州市' },
+    ],
+    '郑州市': [
+      { label: '中原区', value: '中原区' },
+      { label: '二七区', value: '二七区' },
+      { label: '管城区', value: '管城区' },
+      { label: '金水区', value: '金水区' },
+      { label: '上街区', value: '上街区' },
+      { label: '惠济区', value: '惠济区' },
+    ]
+  }
+  
+  return areaMap[searchParams.city] || []
+})
+
+const tagOptions = ref([
+  { id: 1, name: '餐饮' },
+  { id: 2, name: '零售' },
+  { id: 3, name: '服务' },
+  { id: 4, name: '教育' },
+  { id: 5, name: '医疗' },
+  { id: 6, name: '娱乐' },
+])
+
+// 表格配置
+const tableSize = ref<'small' | 'medium' | 'large'>('medium')
+
+// 计算属性：有坐标的商家数量
+const merchantsWithCoordinates = computed(() => {
+  return merchants.value.filter(m => m.lng && m.lat).length
+})
+
+// 计算属性：平均精度
+const averageAccuracy = computed(() => {
+  const withScore = merchants.value.filter(m => m.geocode_score !== null && m.geocode_score !== undefined)
+  if (withScore.length === 0) return 0
+  const sum = withScore.reduce((acc, m) => acc + (m.geocode_score || 0), 0)
+  return sum / withScore.length
+})
+
+// 计算属性：本月新增
+const recentlyAdded = computed(() => {
+  // 这里可以根据实际的创建时间字段来计算
+  // 暂时返回固定值作为示例
+  return 12
+})
+
+// 计算属性：是否有激活的筛选条件
+const hasActiveFilters = computed(() => {
+  return !!(
+    searchParams.keyword ||
+    searchParams.city ||
+    searchParams.area ||
+    searchParams.tags.length > 0 ||
+    searchParams.hasCoordinates ||
+    searchParams.dateRange ||
+    searchParams.geocodeLevel ||
+    searchParams.scoreRange
+  )
+})
+
+// 使用 TDesign 标准验证规则格式
+const formRules = {
+  legal_name: [
+    { required: true, message: '请输入法人姓名', trigger: 'change' },
+    { min: 2, message: '法人姓名至少2个字符', trigger: 'change' },
+    { max: 100, message: '法人姓名最多100个字符', trigger: 'change' }
+  ],
+  address: [
+    { required: true, message: '请输入地址', trigger: 'change' },
+    { min: 5, message: '地址至少5个字符', trigger: 'change' },
+    { max: 200, message: '地址最多200个字符', trigger: 'change' }
+  ],
+  phone: [
+    { 
+      validator: (val: string) => {
+        // 如果为空，则通过验证（非必填）
+        if (!val || val.trim() === '') return true
+        // 如果有值，则验证手机号格式
+        const phoneRegex = /^1[3-9]\d{9}$/
+        return phoneRegex.test(val)
+      }, 
+      message: '请输入有效的手机号码', 
+      trigger: 'blur' 
+    }
+  ],
+  city: [
+    { max: 50, message: '城市名称最多50个字符', trigger: 'change' }
+  ],
+  area: [
+    { max: 50, message: '商圈名称最多50个字符', trigger: 'change' }
+  ]
+}
 
 const columns = [
   { colKey: 'id', title: 'ID', width: 80 },
-  { colKey: 'legal_name', title: '法人姓名' },
-  { colKey: 'phone', title: '联系电话' },
-  { colKey: 'address', title: '地址' },
+  { 
+    colKey: 'legal_name', 
+    title: '法人姓名', 
+    width: 120,
+    filter: {
+      type: 'input' as const,
+      props: {
+        placeholder: '搜索法人姓名'
+      },
+      showConfirmAndReset: true
+    }
+  },
+  { 
+    colKey: 'phone', 
+    title: '联系电话', 
+    width: 130,
+    filter: {
+      type: 'input' as const,
+      props: {
+        placeholder: '搜索电话号码'
+      },
+      showConfirmAndReset: true
+    }
+  },
+  { 
+    colKey: 'address', 
+    title: '详细地址', 
+    width: 200,
+    filter: {
+      type: 'input' as const,
+      props: {
+        placeholder: '搜索地址'
+      },
+      showConfirmAndReset: true
+    }
+  },
+  { 
+    colKey: 'city', 
+    title: '城市', 
+    width: 100,
+    filter: {
+      type: 'input' as const,
+      props: {
+        placeholder: '搜索城市'
+      },
+      showConfirmAndReset: true
+    }
+  },
+  { 
+    colKey: 'area', 
+    title: '商圈', 
+    width: 100,
+    filter: {
+      type: 'single' as const,
+      list: [
+        { label: '居民区', value: '居民区' },
+        { label: '商业（集贸）区', value: '商业（集贸）区' },
+        { label: '其他', value: '其他' },
+      ],
+      showConfirmAndReset: true
+    }
+  },
   { 
     colKey: 'coordinates', 
     title: '经纬度', 
     width: 180,
+    filter: {
+      type: 'single' as const,
+      list: [
+        { label: '有坐标', value: 'has_coordinates' },
+        { label: '无坐标', value: 'no_coordinates' },
+      ],
+      showConfirmAndReset: true
+    },
     cell: (h: any, { row }: { row: Merchant }) => {
       if (row.lng && row.lat) {
         return h('div', { class: 'coordinates-cell' }, [
@@ -214,6 +721,7 @@ function editMerchant(merchant: Merchant) {
 
 async function handleSubmit() {
   try {
+    submitting.value = true
     const valid = await formRef.value?.validate()
     if (!valid) return
 
@@ -223,7 +731,6 @@ async function handleSubmit() {
       address: formData.address,
       city: formData.city,
       area: formData.area,
-      tags: formData.tags,
     }
     
     // 只有当经纬度有值时才添加到payload中
@@ -245,6 +752,8 @@ async function handleSubmit() {
     await loadMerchants()
   } catch (error: any) {
     handleError(error)
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -316,10 +825,103 @@ function getAccuracyTheme(score?: number | null): string {
   return 'primary'                    // 非常精确 - 蓝色
 }
 
+// 处理筛选变化
+function handleFilterChange(filterValue: any, context: any) {
+  console.log('Filter changed:', filterValue, context)
+  // 这里可以根据筛选条件重新加载数据
+  loadMerchants()
+}
+
+// 处理表格变化（排序、筛选、分页等）
+function handleTableChange(data: any, context: any) {
+  console.log('Table changed:', data, context)
+  if (context.trigger === 'pagination') {
+    // 分页变化已经由 handlePageChange 处理
+    return
+  }
+  // 处理其他变化（排序、筛选等）
+  loadMerchants()
+}
+
 function handlePageChange(pageInfo: any) {
   pagination.current = pageInfo.current
   pagination.pageSize = pageInfo.pageSize
   loadMerchants()
+}
+
+// 搜索处理
+function handleSearch() {
+  // 重置到第一页
+  pagination.current = 1
+  loadMerchants()
+}
+
+// 重置筛选
+function resetFilters() {
+  Object.assign(searchParams, {
+    keyword: '',
+    city: '',
+    area: '',
+    tags: [],
+    hasCoordinates: '',
+    dateRange: null,
+    geocodeLevel: '',
+    scoreRange: null,
+  })
+  handleSearch()
+}
+
+// 导出数据
+function handleExport() {
+  MessagePlugin.info('导出功能开发中...')
+}
+
+// 表格设置
+function handleTableSetting() {
+  MessagePlugin.info('列显示设置功能开发中...')
+}
+
+function handleDensitySetting() {
+  if (tableSize.value === 'small') {
+    tableSize.value = 'medium'
+  } else if (tableSize.value === 'medium') {
+    tableSize.value = 'large'
+  } else {
+    tableSize.value = 'small'
+  }
+  MessagePlugin.success(`表格密度已调整为${tableSize.value}`)
+}
+
+// 行点击处理
+function handleRowClick(context: any) {
+  console.log('Row clicked:', context)
+}
+
+// 查看商家详情
+function viewMerchantDetail(merchant: Merchant) {
+  MessagePlugin.info(`查看商家详情：${merchant.legal_name}`)
+}
+
+// 复制商家信息
+function copyMerchantInfo(merchant: Merchant) {
+  const info = `商家信息：
+法人姓名：${merchant.legal_name}
+联系电话：${merchant.phone}
+详细地址：${merchant.address}
+城市：${merchant.city}
+商圈：${merchant.area}
+${merchant.lng && merchant.lat ? `坐标：${merchant.lng}, ${merchant.lat}` : '无坐标信息'}`
+  
+  navigator.clipboard.writeText(info).then(() => {
+    MessagePlugin.success('商家信息已复制到剪贴板')
+  }).catch(() => {
+    MessagePlugin.error('复制失败')
+  })
+}
+
+// 导出单个商家
+function exportSingle(merchant: Merchant) {
+  MessagePlugin.info(`导出商家：${merchant.legal_name}`)
 }
 
 onMounted(() => {
@@ -329,34 +931,133 @@ onMounted(() => {
 
 <style scoped>
 .merchants-page {
-  padding: 24px;
+  padding: 0;
+  background: #f5f7fa;
+  min-height: 100vh;
+}
+
+/* 页面头部样式 */
+.page-header-card {
+  margin-bottom: 16px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
+  align-items: flex-start;
+  padding: 8px 0;
 }
 
-.merchant-list {
-  background: white;
-  border-radius: 8px;
-  padding: 24px;
+.header-left {
+  flex: 1;
 }
 
-.address-input-group {
+.page-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 4px 0;
+  line-height: 1.2;
+}
+
+.page-description {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.header-actions {
+  margin-left: 24px;
+}
+
+/* 筛选区域样式 */
+.filter-card {
+  margin-bottom: 16px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.filter-section {
+  padding: 8px 0;
+}
+
+.basic-filters {
+  margin-bottom: 8px;
+}
+
+.advanced-filters {
+  margin-top: 16px;
+}
+
+.advanced-filters :deep(.t-divider) {
+  margin: 16px 0 20px 0;
+}
+
+.advanced-filters :deep(.t-form-item) {
+  margin-bottom: 16px;
+}
+
+.advanced-filters :deep(.t-form-item__label) {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+/* 统计卡片样式 */
+.stats-row {
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  text-align: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.stat-content {
+  padding: 16px;
+}
+
+.stat-number {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--td-brand-color);
+  margin-bottom: 4px;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* 表格区域样式 */
+.table-card {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.table-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  margin: 0;
 }
 
-.coordinates-display {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+.table-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
 }
 
+/* 表格内容样式 */
 .coordinates-cell {
   display: flex;
   flex-direction: column;
@@ -365,38 +1066,200 @@ onMounted(() => {
 
 .coordinate-item {
   font-size: 12px;
-  color: #666;
+  color: #6b7280;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
 }
 
 .accuracy-badge {
   font-size: 10px;
-  padding: 2px 4px;
-  border-radius: 4px;
+  padding: 2px 6px;
+  border-radius: 12px;
   margin-top: 2px;
+  font-weight: 500;
+  text-align: center;
 }
 
 .accuracy-danger {
-  background: #fef0f0;
-  color: #f56565;
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
 }
 
 .accuracy-warning {
-  background: #fffbf0;
-  color: #ed8936;
+  background: #fffbeb;
+  color: #d97706;
+  border: 1px solid #fed7aa;
 }
 
 .accuracy-success {
-  background: #f0fff4;
-  color: #38a169;
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
 }
 
 .accuracy-primary {
   background: #eff6ff;
-  color: #3182ce;
+  color: #2563eb;
+  border: 1px solid #dbeafe;
 }
 
 .text-placeholder {
-  color: #999;
+  color: #9ca3af;
   font-style: italic;
+  font-size: 13px;
+}
+
+/* 空状态样式 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  color: #6b7280;
+}
+
+.empty-icon {
+  font-size: 48px;
+  color: #d1d5db;
+  margin-bottom: 16px;
+}
+
+.empty-text {
+  font-size: 14px;
+  margin-bottom: 16px;
+  color: #6b7280;
+}
+
+/* TDesign 组件自定义样式 */
+:deep(.t-card) {
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+:deep(.t-card__header) {
+  padding: 20px 24px 0 24px;
+  border-bottom: none;
+}
+
+:deep(.t-card__body) {
+  padding: 20px 24px 24px 24px;
+}
+
+:deep(.t-table) {
+  border-radius: 6px;
+}
+
+:deep(.t-table__header) {
+  background: #f9fafb;
+}
+
+:deep(.t-table__header th) {
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+:deep(.t-table__body tr:hover) {
+  background: #f9fafb;
+}
+
+:deep(.t-table__body td) {
+  border-bottom: 1px solid #f3f4f6;
+}
+
+:deep(.t-pagination) {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f3f4f6;
+}
+
+/* 表单样式优化 */
+:deep(.t-form-item__label) {
+  font-weight: 500;
+  color: #374151;
+}
+
+:deep(.t-divider__content) {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 14px;
+}
+
+:deep(.t-input) {
+  border-radius: 6px;
+}
+
+:deep(.t-select) {
+  border-radius: 6px;
+}
+
+:deep(.t-button) {
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+:deep(.t-button--theme-primary) {
+  box-shadow: 0 1px 2px 0 rgba(var(--td-brand-color-rgb), 0.1);
+}
+
+:deep(.t-button--variant-outline) {
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+:deep(.t-button--variant-outline:hover) {
+  border-color: var(--td-brand-color);
+  color: var(--td-brand-color);
+}
+
+/* 标签样式 */
+:deep(.t-tag) {
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .merchants-page {
+    padding: 0 8px;
+  }
+  
+  .page-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+  
+  .header-actions {
+    margin-left: 0;
+  }
+  
+  .basic-filters :deep(.t-space) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .basic-filters :deep(.t-space > *) {
+    width: 100% !important;
+  }
+  
+  .stats-row :deep(.t-col) {
+    margin-bottom: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-title {
+    font-size: 18px;
+  }
+  
+  .stat-number {
+    font-size: 20px;
+  }
+  
+  :deep(.t-table) {
+    font-size: 12px;
+  }
 }
 </style>

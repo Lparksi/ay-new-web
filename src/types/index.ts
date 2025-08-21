@@ -37,7 +37,7 @@ export interface Merchant {
   id: number
   legal_name: string    // 法人姓名，必填字段
   phone?: string        // 联系电话，可选字段
-  address?: string
+  address: string       // 详细地址，必填字段
   city?: string         // 城市字段，用于地理编码
   area?: string         // 区域字段
   lng?: number          // 经度
