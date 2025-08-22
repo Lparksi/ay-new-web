@@ -69,6 +69,15 @@ export async function deleteMerchant(id: number | string) {
   }
 }
 
+export async function batchDeleteMerchants(ids: number[]) {
+  try {
+    const resp = await http.post('/merchants/batch-delete', ids)
+    return resp.data
+  } catch (e) {
+    throw normalizeError(e)
+  }
+}
+
 function normalizeError(e: any): Error {
   if (e?.response?.data?.message) return new Error(e.response.data.message)
   if (e?.message) return new Error(e.message)

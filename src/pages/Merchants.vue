@@ -361,7 +361,7 @@ import {
   DownloadIcon, EditIcon, DeleteIcon, MoreIcon, BrowseIcon, InfoCircleIcon, CopyIcon
 } from 'tdesign-icons-vue-next'
 import TagSelect from '../components/Selectors/TagSelect.vue'
-import { fetchMerchants, createMerchant, updateMerchant, deleteMerchant as deleteMerchantApi } from '../api/merchant'
+import { fetchMerchants, createMerchant, updateMerchant, deleteMerchant as deleteMerchantApi, batchDeleteMerchants } from '../api/merchant'
 import { fetchTags } from '../api/tag'
 import { geocode } from '../api/geocode'
 import type { Merchant, Tag } from '../types'
@@ -1058,8 +1058,8 @@ async function handleBatchDelete() {
     cancelBtn: '取消',
     onConfirm: async ({ e }) => {
       try {
-        // 这里应该调用批量删除API
-        // await batchDeleteMerchants(selectedRowKeys.value)
+        // 调用批量删除API
+        await batchDeleteMerchants(selectedRowKeys.value.map(Number))
         
         MessagePlugin.success(`批量删除 ${selectedMerchants.value.length} 个商家成功`)
         selectedRowKeys.value = [] // 清空选中状态
