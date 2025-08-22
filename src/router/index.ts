@@ -3,7 +3,7 @@ import type { RouteLocationNormalized, NavigationGuardNext } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
 // Lazy load components
-const CreateTask = () => import('../pages/CreateTask.vue')
+const TaskManagement = () => import('../pages/CreateTask.vue')
 const Login = () => import('../pages/Login.vue')
 const Users = () => import('../pages/Users.vue')
 const Merchants = () => import('../pages/Merchants.vue')
@@ -14,12 +14,16 @@ const Profile = () => import('../pages/Profile.vue')
 const routes = [
   { 
     path: '/', 
-    redirect: '/create-task' 
+    redirect: '/tasks' 
+  },
+  { 
+    path: '/tasks', 
+    component: TaskManagement,
+    meta: { requiresAuth: true }
   },
   { 
     path: '/create-task', 
-    component: CreateTask,
-    meta: { requiresAuth: true }
+    redirect: '/tasks'
   },
   { 
     path: '/users', 

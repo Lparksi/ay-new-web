@@ -4,7 +4,7 @@
       <div style="padding: 16px; font-weight:600;">AY Admin</div>
     </template>
 
-    <t-menu-item value="create-task" :to="{ path: '/create-task' }">创建任务</t-menu-item>
+    <t-menu-item value="tasks" :to="{ path: '/tasks' }">任务管理</t-menu-item>
     <t-menu-item value="users" :to="{ path: '/users' }">用户管理</t-menu-item>
     <t-menu-item value="merchants" :to="{ path: '/merchants' }">商家管理</t-menu-item>
     <t-menu-item value="map" :to="{ path: '/map' }">地图</t-menu-item>
@@ -21,7 +21,7 @@ import { useRouter, useRoute } from 'vue-router'
 const route = useRoute()
 const router = useRouter()
 
-const active = ref(route.path.replace(/^\//, '') || 'create-task')
+const active = ref(route.path.replace(/^\//, '') || 'tasks')
 
 // 同步路由变化到菜单激活
 watch(() => route.path, (p) => {

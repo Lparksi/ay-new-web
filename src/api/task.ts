@@ -2,10 +2,11 @@ import { http } from './index'
 import type { AxiosResponse } from 'axios'
 
 export interface CreateTaskPayload {
-  type: string
+  type: 'visit' | 'survey' | 'audit' | 'onboarding'
   task_name: string
   remarks?: string
   priority?: number
+  status?: number
   scope_json?: string
   plan_start_at?: string | null
   plan_end_at?: string | null
@@ -41,6 +42,39 @@ export interface FetchTasksParams {
 
 export async function fetchTasksPaged(params: FetchTasksParams = {}): Promise<any> {
   const resp: AxiosResponse<any> = await http.get('/tasks', { params })
-  // Expect backend to return { items: [], total: number } in resp.data
-  return resp.data
+  // 根据实际的API响应格式来解析
+  // 后端返回格式: {code: 0, msg: "success", data: {items: [], total: number}}
+  if (resp.data && resp.data.code === 0 && resp.data.data) {
+    return resp.data.data
+  }
+  // 如果格式不对，返回空数据
+  return { items: [], total: 0 }
+}
+
+export async function updateTask(id: number, payload: Partial<CreateTaskPayload>): Promise<AxiosResponse<any>> {
+  const resp = await http.put(`/tasks/${id}`, payload)
+  return resp
+}
+
+export async function deleteTask(id: number): Promise<AxiosResponse<any>> {
+  const resp = await http.delete(`/tasks/${id}`)
+  return resp
+}
+
+export async function assignTask(id: number, assigneeId: number): Promise<AxiosResponse<any>> {
+  const resp = await http.patch(`/tasks/${id}/assign`, { assignee_id: assigneeId })
+  return resp
+}
+
+export async function updateTaskStatus(id: number, status: number): Promise<AxiosResponse<any>> {
+  const resp = await http.patch(`/tasks/${id}/status`, { status })
+  return resp
+}
+
+export async function exportTasks(params: any = {}): Promise<AxiosResponse<Blob>> {
+  const resp = await http.get('/tasks/export', { 
+    params,
+    responseType: 'blob'
+  })
+  return resp
 }

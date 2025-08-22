@@ -64,15 +64,22 @@ export interface Tag {
 
 export interface Task {
   id?: number
-  type: string
+  type: 'visit' | 'survey' | 'audit' | 'onboarding'
   task_name: string
   remarks?: string
   priority?: number
+  status?: 0 | 1 | 2 | 3 | 4  // 0:草稿 1:已分配 2:进行中 3:已完成 4:已取消
   scope_json?: string
   plan_start_at?: string | null
   plan_end_at?: string | null
+  plan_time?: string | null
+  actual_time?: string | null
   assigner_id?: number | null
+  assignee_id?: number | null
   group_id?: number | null
+  assigner?: User
+  assignee?: User
+  progress?: number
   created_at?: string
   updated_at?: string
 }
