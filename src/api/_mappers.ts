@@ -15,6 +15,19 @@ export function mapTagBackendToFrontend(it: any) {
 }
 
 export function mapMerchantBackendToFrontend(it: any) {
+  // 处理标签数据：将标签对象数组转换为ID数组
+  let tags: number[] = []
+  if (Array.isArray(it.tags)) {
+    tags = it.tags.map((tag: any) => {
+      // 如果是对象，提取ID；如果是数字，直接使用
+      return typeof tag === 'object' ? (tag.ID || tag.id) : tag
+    }).filter((id: any) => id !== null && id !== undefined)
+  } else if (Array.isArray(it.TagIDs)) {
+    tags = it.TagIDs
+  } else if (Array.isArray(it.tag_ids)) {
+    tags = it.tag_ids
+  }
+
   return {
     id: it.ID ?? it.id,
     legal_name: it.legal_name ?? it.LegalName ?? '',
@@ -27,7 +40,7 @@ export function mapMerchantBackendToFrontend(it: any) {
     geocode_level: it.geocode_level ?? it.GeocodeLevel ?? '',
     geocode_score: it.geocode_score ?? it.GeocodeScore ?? null,
     geocode_description: it.geocode_description ?? it.GeocodeDescription ?? '',
-    tags: it.tags ?? it.TagIDs ?? it.tag_ids ?? [],
+    tags,
     created_at: it.CreatedAt ?? it.created_at,
     updated_at: it.UpdatedAt ?? it.updated_at,
     deleted_at: it.DeletedAt ?? it.deleted_at ?? null,
