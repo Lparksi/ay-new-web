@@ -192,6 +192,10 @@
                     <template #prefixIcon><download-icon /></template>
                     导出数据
                   </t-dropdown-item>
+                  <t-dropdown-item @click.stop="reparseMerchant(row)">
+                    <template #prefixIcon><refresh-icon /></template>
+                    重新解析
+                  </t-dropdown-item>
                 </t-dropdown-menu>
               </template>
             </t-dropdown>
@@ -305,6 +309,11 @@
               <span style="color: #6b7280; font-size: 12px;">
                 经纬度为可选项，可根据地址自动获取坐标
               </span>
+              <t-space style="margin-left: 8px;" v-if="isEditing">
+                <t-button variant="outline" size="small" @click="triggerReparse" :disabled="!formData.id">
+                  重新解析
+                </t-button>
+              </t-space>
             </t-space>
           </template>
         </t-form-item>
@@ -325,16 +334,7 @@
                   纬度: {{ formData.lat.toFixed(6) }}
                 </t-tag>
               </t-space>
-              <t-space size="8px" v-if="formData.geocode_description">
-                <span style="color: #6b7280; font-size: 12px;">精度等级:</span>
-                <t-tag 
-                  :theme="getAccuracyTheme(formData.geocode_score)" 
-                  variant="light"
-                  size="small"
-                >
-                  {{ formData.geocode_description }}
-                </t-tag>
-              </t-space>
+              <!-- 已移除坐标信息处的定位精度标签，避免重复显示 -->
             </t-space>
           </t-card>
         </t-form-item>
@@ -369,7 +369,7 @@ import * as XLSX from 'xlsx'
 import TagSelect from '../components/Selectors/TagSelect.vue'
 import { fetchMerchants, createMerchant, updateMerchant, deleteMerchant as deleteMerchantApi, batchDeleteMerchants } from '../api/merchant'
 import { batchImportMerchants } from '../api/merchant'
-import { fetchTags } from '../api/tag'
+import { fetchTags, createTag } from '../api/tag'
 import { geocode } from '../api/geocode'
 import type { Merchant, Tag } from '../types'
 import { handleError } from '../utils/error-handler'
@@ -418,6 +418,9 @@ const formData = reactive({
   geocode_description: '',
   tags: [] as number[],
 })
+
+// 用于跟踪编辑时的初始地址，便于检测地址是否被修改以触发重新解析
+const originalAddress = ref('')
 
 // 搜索参数
 const searchParams = reactive({
@@ -681,20 +684,7 @@ const columns = [
           h('div', { class: 'coordinate-item' }, `纬: ${row.lat.toFixed(4)}`)
         ]
         
-        if (row.geocode_description) {
-          elements.push(
-            h('div', { style: 'margin-top: 4px;' }, [
-              h(TTag, { 
-                theme: getAccuracyTheme(row.geocode_score),
-                variant: 'light',
-                size: 'small',
-                class: 'accuracy-tag'
-              }, () => row.geocode_description)
-            ])
-          )
-        }
-        
-        return h('div', { class: 'coordinates-cell' }, elements)
+  return h('div', { class: 'coordinates-cell' }, elements)
       }
       return h('span', { class: 'text-placeholder' }, '未设置')
     }
@@ -706,10 +696,13 @@ const columns = [
     filter: {
       type: 'single' as const,
       list: [
-        { label: '精确到建筑物', value: 'ROOFTOP' },
-        { label: '精确到门牌号段', value: 'RANGE_INTERPOLATED' },
-        { label: '精确到地标中心点', value: 'GEOMETRIC_CENTER' },
-        { label: '大概位置', value: 'APPROXIMATE' },
+  { label: '非常精确', value: '非常精确' },
+  { label: '精确定位', value: '精确定位' },
+  { label: '中等定位', value: '中等定位' },
+  { label: '粗略定位', value: '粗略定位' },
+  { label: '未知精度', value: '未知精度' },
+  { label: '等待解析', value: '等待解析' },
+  { label: '解析失败', value: '解析失败' },
       ],
       resetValue: '',
       showConfirmAndReset: true
@@ -737,18 +730,56 @@ async function loadMerchants() {
       pageSize: pagination.pageSize,
     })
     
-    if (Array.isArray(response)) {
-      merchants.value = response
-      pagination.total = response.length
-    } else {
-      merchants.value = response.items || []
-      pagination.total = response.total || 0
+    let items: Merchant[] = []
+    if (Array.isArray(response)) items = response
+    else items = response.items || []
+
+    // 应用客户端表格筛选（例如定位精度 / 是否有坐标），确保 UI 筛选项生效
+    const filtered = applyClientFilters(items)
+    merchants.value = filtered
+    pagination.total = filtered.length
+
+    // 调试：打印前几条商家及其 tags 字段，和当前前端加载的 tagOptions
+    try {
+      console.log('[loadMerchants] loaded merchants count:', merchants.value.length)
+      console.log('[loadMerchants] first 5 merchants tags:', merchants.value.slice(0,5).map(m=>({ id: m.id, tags: m.tags })))
+      console.log('[loadMerchants] current tagOptions count:', (tagOptions.value || []).length, tagOptions.value.slice(0,10))
+    } catch (e) {
+      // ignore logging errors
     }
   } catch (error: any) {
     handleError(error)
   } finally {
     loading.value = false
   }
+}
+
+// 在前端对表格过滤条件做一次本地筛选以保证与 UI 筛选一致
+function applyClientFilters(items: Merchant[]): Merchant[] {
+  const fv = filterValue.value || {}
+  let out = items.slice()
+
+  // 定位精度筛选：后端返回的主要是描述字符串（geocode_description），前端列中也展示描述，使用描述进行匹配
+  const levelFilter = fv.geocode_level || fv.geocodeLevel || null
+  if (levelFilter) {
+    const selected = Array.isArray(levelFilter) ? levelFilter : [levelFilter]
+    out = out.filter(m => {
+      if (!m.geocode_description) return false
+      return selected.includes(m.geocode_description)
+    })
+  }
+
+  // 坐标存在/不存在筛选（列 key: 'coordinates'）
+  const coordFilter = fv.coordinates || fv.hasCoordinates || null
+  if (coordFilter) {
+    if (coordFilter === 'has_coordinates') {
+      out = out.filter(m => m.lng !== null && m.lat !== null && m.lng !== undefined && m.lat !== undefined)
+    } else if (coordFilter === 'no_coordinates') {
+      out = out.filter(m => !m.lng && !m.lat)
+    }
+  }
+
+  return out
 }
 
 async function loadTags() {
@@ -778,11 +809,58 @@ async function onImportFileChange(e: Event) {
   try {
   // 确保已加载标签数据，以便将标签名称映射为 id
   await loadTags()
+  console.log('[onImportFileChange] loaded tagOptions count:', (tagOptions.value || []).length, tagOptions.value)
   const items = await parseXlsxFile(file)
+    try { console.log('[onImportFileChange] parsed items preview (json):', JSON.stringify(items && items.length ? items.slice(0, 5) : items, null, 2)) } catch (e) { console.log('[onImportFileChange] parsed items preview:', items && items.length ? items.slice(0, 5) : items) }
     if (!items || items.length === 0) {
       MessagePlugin.error('未解析到有效的数据')
       return
     }
+    // 检查是否有自定义筛选占位符，需要先创建对应的标签
+    const placeholders = new Set<string>()
+    items.forEach(it => {
+      if (Array.isArray(it.tags)) {
+        it.tags.forEach((t: any) => {
+          if (typeof t === 'string' && t.startsWith('__NEW_CF__:')) {
+            const raw = t.split(':').slice(1).join(':')
+            try { placeholders.add(decodeURIComponent(raw)) } catch (e) { placeholders.add(raw) }
+          }
+        })
+      }
+    })
+
+    if (placeholders.size > 0) {
+      // 为每个占位别名创建标签（class: 自定义筛选），若已存在则跳过
+      const creates: Promise<any>[] = []
+      for (const alias of Array.from(placeholders)) {
+        const exists = tagOptions.value.find((tg: Tag) => (tg.alias && String(tg.alias).toLowerCase() === String(alias).toLowerCase()) || (tg.name && String(tg.name).toLowerCase() === String(alias).toLowerCase()))
+        if (!exists) {
+          creates.push(createTag({ name: alias, alias: alias, class: '自定义筛选' }))
+        }
+      }
+      if (creates.length > 0) {
+        await Promise.all(creates)
+        // 重新加载标签表以获取新 tag 的 id
+        await loadTags()
+      }
+
+      // 替换占位符为真实 id
+      items.forEach(it => {
+        if (Array.isArray(it.tags)) {
+          it.tags = it.tags.map((t: any) => {
+            if (typeof t === 'string' && t.startsWith('__NEW_CF__:')) {
+              const raw = t.split(':').slice(1).join(':')
+              let alias = raw
+              try { alias = decodeURIComponent(raw) } catch (e) { /* ignore */ }
+              const found = tagOptions.value.find((tg: Tag) => (tg.alias && String(tg.alias).toLowerCase() === String(alias).toLowerCase()) || (tg.name && String(tg.name).toLowerCase() === String(alias).toLowerCase()))
+              return found ? found.id : null
+            }
+            return t
+          }).filter((x: any) => x !== null)
+        }
+      })
+    }
+
     await batchImportMerchants(items)
     MessagePlugin.success('批量导入提交成功')
     await loadMerchants()
@@ -803,7 +881,8 @@ function parseXlsxFile(file: File): Promise<any[]> {
         const workbook = XLSX.read(data, { type: 'array' })
         const firstSheetName = workbook.SheetNames[0]
         const worksheet = workbook.Sheets[firstSheetName]
-        const json = XLSX.utils.sheet_to_json(worksheet, { header: 0 }) as any[]
+  const json = XLSX.utils.sheet_to_json(worksheet, { header: 0 }) as any[]
+  try { console.log('[parseXlsxFile] raw excel headers:', JSON.stringify(Object.keys(json[0] || {}), null, 2)) } catch (e) { console.log('[parseXlsxFile] raw excel headers:', Object.keys(json[0] || {})) }
         const mapped = json.map(row => {
           const out: any = {}
           for (const key in row) {
@@ -814,21 +893,118 @@ function parseXlsxFile(file: File): Promise<any[]> {
           out.legal_name = out.legal_name || out['法人'] || ''
           out.address = out.address || out['经营地址'] || ''
           out.area = out.area || out['商圈'] || ''
-          // 统一标签字段：尝试从标签名称映射为 tag id 列表
+          // 统一标签字段：尝试从标签名称或别名映射为 tag id 列表
           // 支持列名：tags, 标签
           const rawTags = out.tags || out['标签'] || ''
+          const ids: any[] = []
           if (rawTags) {
-            const names = String(rawTags).split(/[,;；，\n]/).map((s: string) => s.trim()).filter((s: string) => s)
-            const ids: number[] = []
-            for (const name of names) {
-              const found = tagOptions.value.find((t: Tag) => (t.name && t.name.toLowerCase() === name.toLowerCase()) || (t.alias && String(t.alias).toLowerCase() === name.toLowerCase()))
-              if (found) ids.push(found.id)
+            // 支持更多分隔符：逗号、分号、顿号、竖线、斜杠、换行等
+            const names = String(rawTags).split(/[,\|\/;；，、\n]/).map((s: string) => s.trim()).filter((s: string) => s)
+            for (const rawName of names) {
+              console.log('[parseXlsxFile] rawTags token:', rawName)
+              const name = String(rawName).trim()
+              const nameLc = name.toLowerCase()
+              // 尝试从别名/代码前缀匹配（例如 A: 描述）
+              const aliasCandidateMatch = name.match(/^([^:：\s]+)/)
+              const aliasCandidate = aliasCandidateMatch ? aliasCandidateMatch[1] : name
+              const aliasLc = String(aliasCandidate).toLowerCase()
+
+              // 优先按完全匹配 alias 或 name
+              let found = tagOptions.value.find((t: Tag) => (t.alias && String(t.alias).toLowerCase() === aliasLc && (t.name || '')?.toString()) || (t.name && t.name.toLowerCase() === nameLc))
+              if (!found) {
+                // 再尝试按 alias 完整匹配（不拆分）或 name 完整匹配
+                found = tagOptions.value.find((t: Tag) => (t.alias && String(t.alias).toLowerCase() === nameLc) || (t.name && t.name.toLowerCase() === nameLc))
+              }
+
+              if (!found) {
+                // 最后尝试包含匹配（仅当 token 长度 >= 3 避免过短误匹配）
+                if (name.length >= 3) {
+                  found = tagOptions.value.find((t: Tag) => (t.name && t.name.toLowerCase().includes(nameLc)) || (t.alias && String(t.alias).toLowerCase().includes(nameLc)))
+                }
+              }
+
+              if (found) {
+                ids.push(found.id)
+                console.log('[parseXlsxFile] rawTags matched:', rawName, '-> id', found.id)
+              } else {
+                console.log('[parseXlsxFile] rawTags no match for:', rawName)
+              }
             }
-            out.tags = ids
-          } else {
-            // 保证 tags 为数组
-            if (!Array.isArray(out.tags)) out.tags = []
           }
+
+          // 处理按类别的标签列：动态识别 Excel 表头是否为已存在标签的 class（类别）
+          // 例如表头为 '终端类型'、'特殊时段'、'自定义筛选' 等。
+          // 只有当类别为 '自定义筛选' 时，才会对不存在的别名生成占位符以便后续创建标签。
+          const seenClasses = new Set<string>()
+          tagOptions.value.forEach((t: Tag) => { if (t.class) seenClasses.add(String(t.class).trim().toLowerCase()) })
+
+          // 扫描当前行的原始表头（使用 row 的 key），找出被识别为 tag class 的列
+          const dynamicCategoryFields: { field: string, className: string, createIfMissing?: boolean }[] = []
+          for (const key in row) {
+            const trimmedHeader = String(key).trim()
+            if (!trimmedHeader) continue
+            if (seenClasses.has(trimmedHeader.toLowerCase())) {
+              const field = headerMap[trimmedHeader] || trimmedHeader
+              const createIfMissing = trimmedHeader === '自定义筛选'
+              // 防止重复加入相同 field
+              if (!dynamicCategoryFields.some(d => d.field === field)) {
+                dynamicCategoryFields.push({ field, className: trimmedHeader, createIfMissing })
+              }
+            }
+          }
+
+          // 调试输出：显示本行识别到的类别列
+          if (dynamicCategoryFields.length > 0) {
+            console.log('[parseXlsxFile] detected category columns for row:', dynamicCategoryFields.map(d => d.className))
+          } else {
+            console.log('[parseXlsxFile] no category columns detected for this row; available seenClasses count=', seenClasses.size)
+          }
+
+          // 处理发现的类别列
+          for (const cf of dynamicCategoryFields) {
+            const val = out[cf.field]
+            if (!val) continue
+            const parts = String(val).split(/[,;；，\n]/).map((s: string) => s.trim()).filter((s: string) => s)
+            for (const pRaw of parts) {
+              const p = String(pRaw)
+              console.log('[parseXlsxFile] processing token:', p, 'for class:', cf.className)
+              // 对非自定义类，优先按别名（冒号前的代码）匹配
+              if (!cf.createIfMissing) {
+                const m = p.match(/^([^:：\s]+)/)
+                const aliasCandidate = m ? m[1] : p
+                const found = tagOptions.value.find((t: Tag) => (String(t.alias || '').toLowerCase() === aliasCandidate.toLowerCase()) && (String(t.class || '').trim().toLowerCase() === cf.className.toLowerCase()))
+                if (found) {
+                  if (!ids.includes(found.id)) ids.push(found.id)
+                  console.log('[parseXlsxFile] matched existing tag by alias:', aliasCandidate, '-> id', found.id)
+                  continue
+                }
+                // fallback: match by full name or alias
+                const fallback = tagOptions.value.find((t: Tag) => (t.name && t.name.toLowerCase() === p.toLowerCase()) || (t.alias && String(t.alias).toLowerCase() === p.toLowerCase()))
+                if (fallback && !ids.includes(fallback.id)) {
+                  ids.push(fallback.id)
+                  console.log('[parseXlsxFile] matched existing tag by name/alias:', p, '-> id', fallback.id)
+                  continue
+                }
+                // 若都未命中，则跳过（不会自动创建）
+                continue
+              }
+
+              // 对于自定义筛选：以单元格原始值为 alias（不拆分），优先查找完全匹配的 alias
+              const aliasToMatch = p
+              const foundCf = tagOptions.value.find((t: Tag) => String(t.alias || '').toLowerCase() === aliasToMatch.toLowerCase() || (t.name && String(t.name).toLowerCase() === aliasToMatch.toLowerCase()))
+              if (foundCf) {
+                if (!ids.includes(foundCf.id)) ids.push(foundCf.id)
+                console.log('[parseXlsxFile] matched existing custom-filter tag:', aliasToMatch, '-> id', foundCf.id)
+                continue
+              }
+              // 未找到则生成占位符，使用 encodeURIComponent 避免分隔符问题
+              const placeholder = `__NEW_CF__:${encodeURIComponent(aliasToMatch)}`
+              console.log('[parseXlsxFile] creating placeholder for custom filter:', aliasToMatch, '->', placeholder)
+              if (!ids.includes(placeholder)) ids.push(placeholder)
+            }
+          }
+
+          out.tags = ids
 
           // 标记坐标为等待解析，清空经纬度，保留其他字段以便后端处理
           out.lng = null
@@ -869,6 +1045,7 @@ function editMerchant(merchant: Merchant) {
   formData.geocode_description = merchant.geocode_description || ''
   formData.tags = merchant.tags || []
   isEditing.value = true
+  originalAddress.value = merchant.address || ''
   showModal.value = true
 }
 
@@ -927,6 +1104,63 @@ async function handleSubmit() {
   }
 }
 
+// 在编辑 modal 中触发重新解析按钮使用的函数
+async function triggerReparse() {
+  if (!formData.id) return
+  const dialog = DialogPlugin.confirm({
+    header: '重新解析确认',
+    body: '确定要对该商户重新触发地址解析吗？这会将解析状态置为等待解析并由后端重新处理。',
+    confirmBtn: '确定',
+    cancelBtn: '取消',
+    onConfirm: async ({ e }) => {
+  dialog.destroy()
+  await doReparse(formData.id as number)
+    },
+    onCancel: ({ e }) => {
+      dialog.destroy()
+    }
+  })
+}
+
+// 表格行“重新解析”操作
+async function reparseMerchant(row: Merchant) {
+  const dialog = DialogPlugin.confirm({
+    header: '重新解析确认',
+    body: `确定要对商户 "${row.legal_name}" 重新触发地址解析吗？`,
+    confirmBtn: '确定',
+    cancelBtn: '取消',
+    onConfirm: async ({ e }) => {
+  dialog.destroy()
+  await doReparse(row.id)
+    },
+    onCancel: ({ e }) => {
+      dialog.destroy()
+    }
+  })
+}
+
+async function doReparse(id: number) {
+  try {
+    submitting.value = true
+    // 只更新解析状态，后端会重置 attempts 并将记录置为等待解析
+    await updateMerchant(id, { geocode_description: '等待解析' })
+    // 如果当前 modal 正在编辑且是同一条记录，更新本地表单显示
+    if (isEditing.value && formData.id === id) {
+      formData.geocode_description = '等待解析'
+      formData.geocode_score = null
+      formData.geocode_level = ''
+      formData.lng = null
+      formData.lat = null
+    }
+    MessagePlugin.success('已标记为等待解析，后台将尽快处理')
+    await loadMerchants()
+  } catch (err: any) {
+    handleError(err)
+  } finally {
+    submitting.value = false
+  }
+}
+
 function handleCancel() {
   showModal.value = false
   resetForm()
@@ -945,7 +1179,21 @@ function resetForm() {
   formData.geocode_score = null
   formData.geocode_description = ''
   formData.tags = []
+  originalAddress.value = ''
 }
+
+// 监听地址变化：在编辑已有商户时，如果地址被修改，自动把 geocode_description 标记为等待解析
+watch(() => formData.address, (newVal, oldVal) => {
+  try {
+    if (isEditing.value && originalAddress.value && (String(newVal || '').trim() !== String(originalAddress.value || '').trim())) {
+      if (formData.geocode_description !== '等待解析') {
+        formData.geocode_description = '等待解析'
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+})
 
 async function deleteMerchant(merchant: Merchant) {
   // 显示确认对话框
