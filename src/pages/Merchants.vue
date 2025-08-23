@@ -17,6 +17,11 @@
               <template #icon><add-icon /></template>
               新建商家
             </t-button>
+            <input ref="importFileInput" type="file" accept=".xlsx,.xls" style="display:none" @change="onImportFileChange" />
+            <t-button variant="outline" @click="triggerImportClick">
+              <template #icon><download-icon /></template>
+              批量导入
+            </t-button>
           </t-space>
         </div>
       </div>
@@ -360,8 +365,10 @@ import {
   AddIcon, LocationIcon, SearchIcon, RefreshIcon, ChevronDownIcon, ChevronUpIcon,
   DownloadIcon, EditIcon, DeleteIcon, MoreIcon, BrowseIcon, InfoCircleIcon, CopyIcon
 } from 'tdesign-icons-vue-next'
+import * as XLSX from 'xlsx'
 import TagSelect from '../components/Selectors/TagSelect.vue'
 import { fetchMerchants, createMerchant, updateMerchant, deleteMerchant as deleteMerchantApi, batchDeleteMerchants } from '../api/merchant'
+import { batchImportMerchants } from '../api/merchant'
 import { fetchTags } from '../api/tag'
 import { geocode } from '../api/geocode'
 import type { Merchant, Tag } from '../types'
@@ -376,6 +383,20 @@ const showModal = ref(false)
 const isEditing = ref(false)
 const formRef = ref()
 const selectedRowKeys = ref<(string | number)[]>([])
+const importFileInput = ref<HTMLInputElement | null>(null)
+
+// 映射表头到请求字段
+const headerMap: Record<string, string> = {
+  '法人': 'legal_name',
+  '经营地址': 'address',
+  '商圈': 'area',
+  '有效时间': 'valid_time',
+  '交通情况': 'traffic',
+  '固定事件': 'fixed_event',
+  '终端类型': 'terminal_type',
+  '特殊时段': 'special_periods',
+  '自定义筛选': 'custom_filters',
+}
 
 const pagination = reactive({
   current: 1,
@@ -596,17 +617,6 @@ const columns = [
     }
   },
   { 
-    colKey: 'city', 
-    title: '城市',
-    width: 100,
-    filter: {
-      type: 'single' as const,
-      list: cityOptions.value.map(item => ({ label: item.label, value: item.value })),
-      resetValue: '',
-      showConfirmAndReset: true
-    }
-  },
-  { 
     colKey: 'area', 
     title: '商圈',
     width: 120,
@@ -754,6 +764,91 @@ async function loadTags() {
   }
 }
 
+function triggerImportClick() {
+  if (importFileInput.value) {
+    (importFileInput.value as HTMLInputElement).click()
+  }
+}
+
+// 文件选择处理
+async function onImportFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (!input || !input.files || input.files.length === 0) return
+  const file = input.files[0]
+  try {
+  // 确保已加载标签数据，以便将标签名称映射为 id
+  await loadTags()
+  const items = await parseXlsxFile(file)
+    if (!items || items.length === 0) {
+      MessagePlugin.error('未解析到有效的数据')
+      return
+    }
+    await batchImportMerchants(items)
+    MessagePlugin.success('批量导入提交成功')
+    await loadMerchants()
+  } catch (err: any) {
+    console.error('批量导入出错', err)
+    MessagePlugin.error('批量导入失败: ' + (err?.message || err))
+  } finally {
+    input.value = ''
+  }
+}
+
+function parseXlsxFile(file: File): Promise<any[]> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const data = ev.target?.result
+        const workbook = XLSX.read(data, { type: 'array' })
+        const firstSheetName = workbook.SheetNames[0]
+        const worksheet = workbook.Sheets[firstSheetName]
+        const json = XLSX.utils.sheet_to_json(worksheet, { header: 0 }) as any[]
+        const mapped = json.map(row => {
+          const out: any = {}
+          for (const key in row) {
+            const trimmed = String(key).trim()
+            const field = headerMap[trimmed] || trimmed
+            out[field] = row[key]
+          }
+          out.legal_name = out.legal_name || out['法人'] || ''
+          out.address = out.address || out['经营地址'] || ''
+          out.area = out.area || out['商圈'] || ''
+          // 统一标签字段：尝试从标签名称映射为 tag id 列表
+          // 支持列名：tags, 标签
+          const rawTags = out.tags || out['标签'] || ''
+          if (rawTags) {
+            const names = String(rawTags).split(/[,;；，\n]/).map((s: string) => s.trim()).filter((s: string) => s)
+            const ids: number[] = []
+            for (const name of names) {
+              const found = tagOptions.value.find((t: Tag) => (t.name && t.name.toLowerCase() === name.toLowerCase()) || (t.alias && String(t.alias).toLowerCase() === name.toLowerCase()))
+              if (found) ids.push(found.id)
+            }
+            out.tags = ids
+          } else {
+            // 保证 tags 为数组
+            if (!Array.isArray(out.tags)) out.tags = []
+          }
+
+          // 标记坐标为等待解析，清空经纬度，保留其他字段以便后端处理
+          out.lng = null
+          out.lat = null
+          out.geocode_level = out.geocode_level || ''
+          out.geocode_score = null
+          out.geocode_description = out.geocode_description || '等待解析'
+
+          return out
+        })
+        resolve(mapped)
+      } catch (e) {
+        reject(e)
+      }
+    }
+    reader.onerror = (err) => reject(err)
+    reader.readAsArrayBuffer(file)
+  })
+}
+
 function showCreateForm() {
   resetForm()
   isEditing.value = false
@@ -803,8 +898,23 @@ async function handleSubmit() {
       await updateMerchant(formData.id, payload)
       MessagePlugin.success('更新商家成功')
     } else {
-      await createMerchant(payload)
-      MessagePlugin.success('创建商家成功')
+      // 新建前按 法人姓名 + 详细地址 查重：若命中则更新而非新建
+      const legal = (formData.legal_name || '').trim().toLowerCase()
+      const addr = (formData.address || '').trim().toLowerCase()
+      const existing = merchants.value.find(m => {
+        const mLegal = (m.legal_name || '').trim().toLowerCase()
+        const mAddr = (m.address || '').trim().toLowerCase()
+        return mLegal === legal && mAddr === addr
+      })
+
+      if (existing && existing.id) {
+        // 如果有命中，更新该记录
+        await updateMerchant(existing.id, payload)
+        MessagePlugin.success('匹配到已有商家，已执行更新')
+      } else {
+        await createMerchant(payload)
+        MessagePlugin.success('创建商家成功')
+      }
     }
 
     showModal.value = false

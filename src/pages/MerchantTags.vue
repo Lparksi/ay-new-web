@@ -7,9 +7,9 @@
           <template #icon><add-icon /></template>
           新建标签
         </t-button>
-        <t-button theme="default" @click="showBatchCreateForm">
-          <template #icon><add-icon /></template>
-          批量创建
+        <t-button theme="default" @click="preloadBuiltinTags">
+          <template #icon><download-icon /></template>
+          预载内置标签
         </t-button>
       </div>
     </div>
@@ -125,28 +125,7 @@
       </t-form>
     </t-dialog>
 
-    <!-- Batch Create Modal -->
-    <t-dialog
-      v-model:visible="showBatchModal"
-      title="批量创建标签"
-      width="600px"
-      @confirm="handleBatchSubmit"
-      @cancel="handleBatchCancel"
-    >
-      <div class="batch-form">
-        <p>每行一个标签名称，支持格式：</p>
-        <ul>
-          <li>标签名称</li>
-          <li>标签名称,#颜色代码</li>
-          <li>标签名称,#颜色代码,描述</li>
-        </ul>
-        <t-textarea
-          v-model:value="batchText"
-          placeholder="示例：&#10;餐饮&#10;零售,#FF0000&#10;服务,#00FF00,服务行业标签"
-          :autosize="{ minRows: 6, maxRows: 12 }"
-        />
-      </div>
-    </t-dialog>
+  <!-- (手动批量创建功能已移除) -->
   </div>
 </template>
 
@@ -166,11 +145,9 @@ const authStore = useAuthStore()
 const tags = ref<TagType[]>([])
 const loading = ref(false)
 const showModal = ref(false)
-const showBatchModal = ref(false)
 const isEditing = ref(false)
 const formRef = ref()
 const selectedRowKeys = ref<number[]>([])
-const batchText = ref('')
 
 const pagination = reactive({
   current: 1,
@@ -277,10 +254,6 @@ function showCreateForm() {
   showModal.value = true
 }
 
-function showBatchCreateForm() {
-  batchText.value = ''
-  showBatchModal.value = true
-}
 
 function editTag(tag: TagType) {
   formData.id = tag.id
@@ -323,50 +296,14 @@ async function handleSubmit() {
   }
 }
 
-async function handleBatchSubmit() {
-  try {
-    if (!batchText.value.trim()) {
-      MessagePlugin.warning('请输入标签内容')
-      return
-    }
-
-    const lines = batchText.value.trim().split('\n')
-    const tagData = lines.map(line => {
-      const parts = line.split(',').map(p => p.trim())
-      return {
-        name: parts[0],
-        alias: parts[1] || '',
-        class: parts[2] || '',
-        remarks: parts[3] || '',
-      }
-    }).filter(tag => tag.name)
-
-    if (tagData.length === 0) {
-      MessagePlugin.warning('没有有效的标签数据')
-      return
-    }
-
-  await batchCreateTags(tagData)
-  MessagePlugin.success(`批量创建 ${tagData.length} 个标签成功`)
-  // 新建后跳回第一页以确保能看到新建的数据
-  pagination.current = 1
-
-  showBatchModal.value = false
-  await loadTags()
-  } catch (error: any) {
-    MessagePlugin.error('批量创建失败: ' + error.message)
-  }
-}
+// manual batch create removed
 
 function handleCancel() {
   showModal.value = false
   resetForm()
 }
 
-function handleBatchCancel() {
-  showBatchModal.value = false
-  batchText.value = ''
-}
+// manual batch create removed
 
 function resetForm() {
   formData.id = null
@@ -459,6 +396,99 @@ function batchExport() {
   }
 }
 
+// 预载内置标签
+async function preloadBuiltinTags() {
+  // 从给定的 select 中提取出的内置标签分组
+  const groups: { cls: string; items: string[] }[] = [
+    {
+      cls: '有效时间',
+      items: [
+        'A：开门较晚，上午10点后拜访',
+        'B：中午门店没有人',
+        'C：关门时间较晚',
+      ],
+    },
+    {
+      cls: '交通情况',
+      items: [
+        'A：附近学校，中午傍晚绕行',
+        'B：上午有集市，建议下午拜访',
+        'C：麦收期间道路拥堵',
+        'D：周边道路施工',
+      ],
+    },
+    {
+      cls: '固定事件',
+      items: [
+        'A：老人家在家，订货人特定时间在店内',
+        'B：下午麻将场，建议上午拜访',
+        'C：门店装修',
+      ],
+    },
+    {
+      cls: '终端类型',
+      items: [
+        'A：加盟终端',
+        'B：现代终端',
+        'C：普通终端',
+      ],
+    },
+    {
+      cls: '特殊时段',
+      items: [
+        'A：大学周边，寒暑假期间营业时间不固定',
+        'B：农忙季节',
+        'C：周期性集市',
+      ],
+    },
+  ]
+
+  // 询问确认，等待用户操作
+  const confirmed = await new Promise<boolean>((resolve) => {
+    DialogPlugin.confirm({
+      header: '预载内置标签',
+      body: `确定要预载 ${groups.reduce((s, g) => s + g.items.length, 0)} 个内置标签吗？`,
+      theme: 'info',
+      onConfirm: () => resolve(true),
+      onCancel: () => resolve(false),
+    })
+  })
+  if (!confirmed) return
+
+  // 构建批量创建数据：解析出 alias（代码）和 name（描述），class 使用分组名称
+  const tagData = [] as any[]
+  groups.forEach(g => {
+    g.items.forEach(item => {
+      // 尝试用中文冒号或英文冒号分割
+      const parts = item.split(/：|:/)
+      const alias = parts[0] ? parts[0].trim() : ''
+      const name = parts[1] ? parts[1].trim() : item
+      tagData.push({ name, alias, class: g.cls, remarks: '' })
+    })
+  })
+
+  try {
+    // 与批量创建相同的去重逻辑：若匹配已存在则更新，否则批量创建
+    const toCreate: any[] = []
+    const updatePromises: Promise<any>[] = []
+    tagData.forEach(t => {
+      const existing = tags.value.find(ex => ex.name === t.name || ex.alias === t.alias || ex.name === t.alias || ex.alias === t.name)
+      const payload = { name: t.name, alias: t.alias, class: t.class, remarks: t.remarks }
+      if (existing) updatePromises.push(updateTag(existing.id, payload))
+      else toCreate.push(payload)
+    })
+
+    await Promise.all(updatePromises)
+    if (toCreate.length > 0) await batchCreateTags(toCreate)
+    MessagePlugin.success(`已预载：新增 ${toCreate.length} 个，更新 ${updatePromises.length} 个内置标签`)
+    // 刷新列表和分类选项
+    await loadTags()
+    await loadClassOptions()
+  } catch (err: any) {
+    MessagePlugin.error('预载失败: ' + (err?.message || err))
+  }
+}
+
 async function batchDelete() {
   if (selectedRowKeys.value.length === 0) {
     MessagePlugin.warning('请先选择要删除的标签')
@@ -466,7 +496,8 @@ async function batchDelete() {
   }
   
   // 使用 DialogPlugin.confirm 显示确认对话框
-  const confirmed = await new Promise((resolve) => {
+  // 使用 DialogPlugin.confirm 并通过回调包装 Promise，确保等待用户确认或取消
+  const confirmed = await new Promise<boolean>((resolve) => {
     DialogPlugin.confirm({
       header: '批量删除确认',
       body: `确定要删除选中的 ${selectedRowKeys.value.length} 个标签吗？`,
@@ -475,7 +506,7 @@ async function batchDelete() {
       onCancel: () => resolve(false),
     })
   })
-  
+
   if (!confirmed) return
   
   try {
@@ -495,7 +526,8 @@ async function batchRestore() {
   }
   
   // 使用 DialogPlugin.confirm 显示确认对话框
-  const confirmed = await new Promise((resolve) => {
+  // 使用 DialogPlugin.confirm 并通过回调包装 Promise，确保等待用户确认或取消
+  const confirmed = await new Promise<boolean>((resolve) => {
     DialogPlugin.confirm({
       header: '批量恢复确认',
       body: `确定要恢复选中的 ${selectedRowKeys.value.length} 个标签吗？`,
@@ -504,7 +536,7 @@ async function batchRestore() {
       onCancel: () => resolve(false),
     })
   })
-  
+
   if (!confirmed) return
   
   try {

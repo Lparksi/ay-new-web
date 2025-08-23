@@ -86,13 +86,15 @@ export async function deleteTag(id: number | string) {
 export async function batchCreateTags(tags: Partial<Tag>[]) {
   try {
     // convert each tag to backend shape
-    const body = { tags: tags.map(t => ({
+    const payload = tags.map(t => ({
       tag_name: t.name,
       alias: t.alias,
       class: t.class,
       remarks: t.remarks,
-    })) }
-    const resp = await http.post('/merchant-tags/batch', body)
+    }))
+
+    // Some backends expect an array body for batch endpoints, send array directly
+    const resp = await http.post('/merchant-tags/batch', payload)
     return resp.data
   } catch (e) {
     throw normalizeError(e)

@@ -78,6 +78,15 @@ export async function batchDeleteMerchants(ids: number[]) {
   }
 }
 
+export async function batchImportMerchants(payload: any[]) {
+  try {
+    const resp = await http.post('/merchants/batch-import', payload)
+    return resp.data
+  } catch (e) {
+    throw normalizeError(e)
+  }
+}
+
 function normalizeError(e: any): Error {
   if (e?.response?.data?.message) return new Error(e.response.data.message)
   if (e?.message) return new Error(e.message)
