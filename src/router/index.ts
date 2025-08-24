@@ -10,6 +10,7 @@ const Merchants = () => import('../pages/Merchants.vue')
 const Map = () => import('../pages/Map.vue')
 const MerchantTags = () => import('../pages/MerchantTags.vue')
 const Profile = () => import('../pages/Profile.vue')
+const MyTasks = () => import('../pages/MyTasks.vue')
 
 const routes = [
   { 
@@ -38,6 +39,11 @@ const routes = [
   { 
     path: '/map', 
     component: Map,
+    meta: { requiresAuth: true }
+  },
+  { 
+    path: '/my-tasks',
+    component: MyTasks,
     meta: { requiresAuth: true }
   },
   { 

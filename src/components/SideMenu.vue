@@ -5,6 +5,7 @@
     </template>
 
     <t-menu-item value="tasks" :to="{ path: '/tasks' }">任务管理</t-menu-item>
+  <t-menu-item value="my-tasks" :to="{ path: '/my-tasks' }">我的任务</t-menu-item>
     <t-menu-item value="users" :to="{ path: '/users' }">用户管理</t-menu-item>
     <t-menu-item value="merchants" :to="{ path: '/merchants' }">商家管理</t-menu-item>
     <t-menu-item value="map" :to="{ path: '/map' }">地图</t-menu-item>

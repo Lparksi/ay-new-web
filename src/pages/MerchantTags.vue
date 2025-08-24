@@ -130,10 +130,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive } from 'vue'
+import { ref, onMounted, reactive, onUnmounted } from 'vue'
 import { Table, Button, Dialog, Form, FormItem, Input, Textarea, Tag, MessagePlugin, Select, DialogPlugin } from 'tdesign-vue-next'
 import { AddIcon, DeleteIcon, RefreshIcon, DownloadIcon } from 'tdesign-icons-vue-next'
 import { fetchTags, createTag, updateTag, deleteTag as deleteTagApi, batchCreateTags } from '../api/tag'
+import { formatTagLabel } from '../utils/tags'
 import type { Tag as TagType } from '../types'
 import { formValidationRules } from '../utils/form-validation'
 import { handleError } from '../utils/error-handler'
@@ -313,6 +314,31 @@ function resetForm() {
   formData.remarks = ''
 }
 
+// 全局事件：从其它组件触发打开标签管理创建弹窗（可带初始 name）
+function openTagManagerFromEvent(e: Event) {
+  try {
+    const ev = e as CustomEvent
+    const detail = ev?.detail || {}
+    resetForm()
+    isEditing.value = false
+    if (detail && detail.name) formData.name = String(detail.name)
+    showModal.value = true
+  } catch (err) {
+    console.warn('openTagManagerFromEvent error', err)
+    resetForm()
+    isEditing.value = false
+    showModal.value = true
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('open-tag-manager', openTagManagerFromEvent as EventListener)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('open-tag-manager', openTagManagerFromEvent as EventListener)
+})
+
 async function deleteTag(tag: TagType) {
   try {
     await deleteTagApi(tag.id)
@@ -355,7 +381,8 @@ function batchExport() {
     // 准备Excel数据
     const excelData = selectedTags.map(tag => ({
       'ID': tag.id,
-      '标签名称': tag.name || '',
+      // 使用 formatTagLabel 生成导出文件中的显示值，仍保留别名/分类为独立列
+      '标签名称': formatTagLabel(tag) || tag.name || '',
       '别名': tag.alias || '',
       '分类': tag.class || '',
       '备注': tag.remarks || '',

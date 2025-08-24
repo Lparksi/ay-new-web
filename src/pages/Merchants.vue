@@ -356,9 +356,10 @@
 
 <script setup lang="ts">
 import { ref, onMounted, reactive, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { 
   Table, Button, Dialog, Form, FormItem, Input, MessagePlugin, Tag as TTag, Space, 
-  Divider, Card, Alert, Select, Option, DateRangePicker, RangeInput,
+  Divider, Card, Alert, Select, Option, DateRangePicker, RangeInput, Cascader as TCascader,
   Row, Col, Textarea, Tooltip, Dropdown, DropdownMenu, DropdownItem, DialogPlugin
 } from 'tdesign-vue-next'
 import { 
@@ -367,6 +368,7 @@ import {
 } from 'tdesign-icons-vue-next'
 import * as XLSX from 'xlsx'
 import TagSelect from '../components/Selectors/TagSelect.vue'
+import { formatTagLabel } from '../utils/tags'
 import { fetchMerchants, createMerchant, updateMerchant, deleteMerchant as deleteMerchantApi, batchDeleteMerchants } from '../api/merchant'
 import { batchImportMerchants } from '../api/merchant'
 import { fetchTags, createTag } from '../api/tag'
@@ -481,6 +483,35 @@ const areaOptions = computed(() => {
 
 const tagOptions = ref<Tag[]>([])
 
+// 将所有标签按 class（类别）分组，供 Cascader 使用（每个类别为一级，标签为叶子）
+const tagCascaderOptions = computed(() => {
+  const groups: Record<string, Tag[]> = {}
+  const allTags = tagOptions.value || []
+  
+  // 按类别分组标签
+  allTags.forEach((t: Tag) => {
+    const cls = (t.class && String(t.class).trim()) || '其他'
+    if (!groups[cls]) groups[cls] = []
+    groups[cls].push(t)
+  })
+
+  // 生成级联选择器的选项结构
+  return Object.keys(groups)
+    .sort() // 按类别名称排序
+    .map((cls) => ({
+      label: `${cls} (${groups[cls].length})`,
+      value: `class:${cls}`,
+      children: groups[cls]
+        .sort((a, b) => (a.name || '').localeCompare(b.name || '')) // 按标签名称排序
+        .map((tg: Tag) => ({
+          label: formatTagLabel(tg),
+          value: tg.id,
+          // 添加额外信息便于调试
+          title: `ID: ${tg.id}, 类别: ${cls}`
+        }))
+    }))
+})
+
 // 计算属性：平均精度
 const averageAccuracy = computed(() => {
   const withScore = merchants.value.filter(m => m.geocode_score !== null && m.geocode_score !== undefined)
@@ -570,7 +601,7 @@ const formRules = {
   ]
 }
 
-const columns = [
+const columns = computed(() => [
   {
     colKey: 'row-select',
     type: 'multiple',
@@ -639,29 +670,40 @@ const columns = [
     title: '标签',
     width: 150,
     filter: {
-      type: 'multiple' as const,
-      list: tagOptions.value.map((tag: Tag) => ({ label: tag.name, value: tag.id })),
+      type: 'multiple',
+      list: tagOptions,
       resetValue: [],
       showConfirmAndReset: true
     },
     cell: (h: any, { row }: { row: Merchant }) => {
-      if (!row.tags || row.tags.length === 0) {
+      if (!row.tags || !Array.isArray(row.tags) || row.tags.length === 0) {
         return h('span', { class: 'text-placeholder' }, '无标签')
       }
       
       const tagElements = row.tags.map((tagId: number) => {
-        const tag = tagOptions.value.find((t: Tag) => t.id === tagId)
-        if (!tag) return null
+        const tag = tagOptions.value.find((t: Tag) => t.id === Number(tagId))
+        if (!tag) {
+          // 如果找不到标签，显示ID
+          return h('span', { 
+            class: 'text-placeholder',
+            style: 'font-size: 12px; color: #999;'
+          }, `[未知标签:${tagId}]`)
+        }
         
+        const label = formatTagLabel(tag)
         return h(TTag, {
           theme: 'primary',
           variant: 'light',
           size: 'small',
+          title: `ID: ${tag.id}, 类别: ${tag.class || '其他'}`,
           style: 'margin-right: 4px; margin-bottom: 2px;'
-        }, () => tag.name)
+        }, () => label)
       }).filter(Boolean)
       
-      return h('div', { class: 'tags-cell' }, tagElements)
+      return h('div', { 
+        class: 'tags-cell',
+        style: 'max-width: 140px; line-height: 1.4;'
+      }, tagElements)
     }
   },
   { 
@@ -720,7 +762,7 @@ const columns = [
     }
   },
   { colKey: 'actions', title: '操作', width: 120, fixed: 'right' },
-]
+])
 
 async function loadMerchants() {
   try {
@@ -779,6 +821,19 @@ function applyClientFilters(items: Merchant[]): Merchant[] {
     }
   }
 
+  // 标签筛选：支持级联筛选器返回的标签ID数组
+  const tagFilter = fv.tags || []
+  if (Array.isArray(tagFilter) && tagFilter.length > 0) {
+    const selectedTagIds = tagFilter.map((v: any) => Number(v)).filter((n: number) => !Number.isNaN(n))
+    if (selectedTagIds.length > 0) {
+      out = out.filter(merchant => {
+        if (!Array.isArray(merchant.tags) || merchant.tags.length === 0) return false
+        // 检查商家是否包含任何一个选中的标签
+        return merchant.tags.some((tagId: number) => selectedTagIds.includes(Number(tagId)))
+      })
+    }
+  }
+
   return out
 }
 
@@ -790,10 +845,34 @@ async function loadTags() {
     } else {
       tagOptions.value = response.items || []
     }
+    
+    console.log('标签加载成功:', tagOptions.value.length, '个标签')
+    console.log('标签类别分布:', tagCascaderOptions.value.map(opt => ({
+      category: opt.label,
+      count: opt.children?.length || 0
+    })))
   } catch (error: any) {
     console.error('加载标签失败:', error)
+    MessagePlugin.error('加载标签数据失败')
   }
 }
+
+// 监听标签数据变化，确保级联筛选器数据同步
+watch(tagOptions, (newTags, oldTags) => {
+  if (newTags.length !== oldTags.length) {
+    console.log('标签数据已更新，级联筛选器选项:', tagCascaderOptions.value.length, '个类别')
+    
+    // 更新表格标签列的filter list
+    const tagsColumn = columns.value.find(col => col.colKey === 'tags')
+    if (tagsColumn && tagsColumn.filter && 'list' in tagsColumn.filter) {
+      (tagsColumn.filter as any).list = tagOptions.value.map((tag: Tag) => ({
+        label: formatTagLabel(tag),
+        value: tag.id.toString()
+      }))
+      console.log('已更新标签筛选器选项，共', (tagsColumn.filter as any).list.length, '个标签')
+    }
+  }
+}, { deep: true })
 
 function triggerImportClick() {
   if (importFileInput.value) {
@@ -1262,6 +1341,23 @@ function getAccuracyTheme(score?: number | null): 'default' | 'primary' | 'succe
 function handleFilterChange(filters: any, context: any) {
   console.log('Filter changed:', filters, context)
   
+  // 特别处理标签筛选器的值
+  if (filters.tags && Array.isArray(filters.tags)) {
+    console.log('Tags filter values:', filters.tags)
+    
+    // 验证标签ID的有效性
+    const validTagIds = filters.tags.filter((id: any) => {
+      const numId = Number(id)
+      return !isNaN(numId) && tagOptions.value.some((tag: Tag) => tag.id === numId)
+    })
+    
+    if (validTagIds.length !== filters.tags.length) {
+      console.warn('Some tag IDs are invalid:', filters.tags.filter((id: any) => !validTagIds.includes(id)))
+    }
+    
+    filters.tags = validTagIds
+  }
+  
   // 更新全局筛选值状态
   filterValue.value = { ...filters }
   
@@ -1473,9 +1569,36 @@ function exportSingle(merchant: Merchant) {
   }
 }
 
-onMounted(() => {
-  loadMerchants()
-  loadTags()
+onMounted(async () => {
+  try {
+    // 首先加载标签数据，为级联筛选器提供选项
+    await loadTags()
+    console.log('标签数据加载完成:', tagOptions.value.length)
+    
+    // 然后加载商家数据
+    await loadMerchants()
+    console.log('商家数据加载完成:', merchants.value.length)
+    // 处理路由传入的新建商户坐标（来自地图选点）
+    const route = useRoute()
+    const q = route.query || {}
+    const newLng = q.newLng ? Number(q.newLng) : null
+    const newLat = q.newLat ? Number(q.newLat) : null
+    if (newLng && newLat) {
+      resetForm()
+      formData.lng = newLng
+      formData.lat = newLat
+      // 标记为精确定位
+      formData.geocode_level = 'precise'
+      formData.geocode_score = 90
+      formData.geocode_description = '精确定位（用户手动选点）'
+      showModal.value = true
+      isEditing.value = false
+      MessagePlugin.success('已从地图加载坐标，正在创建新商户')
+    }
+  } catch (error) {
+    console.error('页面初始化失败:', error)
+    handleError(error)
+  }
 })
 </script>
 

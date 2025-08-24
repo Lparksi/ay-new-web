@@ -78,3 +78,13 @@ export async function exportTasks(params: any = {}): Promise<AxiosResponse<Blob>
   })
   return resp
 }
+
+export async function fetchTaskProgress(id: number): Promise<AxiosResponse<any>> {
+  const resp = await http.get(`/tasks/${id}/progress`)
+  return resp
+}
+
+export async function transitionTask(id: number, action: string): Promise<AxiosResponse<any>> {
+  const resp = await http.post(`/tasks/${id}/transition`, { action })
+  return resp
+}

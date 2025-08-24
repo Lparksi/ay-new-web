@@ -55,7 +55,7 @@
           <UserSelect 
             :model-value="filters.assigneeId || undefined" 
             :multiple="false" 
-            placeholder="指派人"
+            placeholder="执行人（被分配者）"
             @update:model-value="(val: any) => { filters.assigneeId = val; onFilter() }"
           />
         </t-col>
@@ -96,19 +96,23 @@
           </t-tag>
         </template>
 
-        <!-- 进度列 -->
+  <!-- progress removed: managed by backend -->
+        <!-- 只读进度列 -->
         <template #progress="{ row }">
-          <t-progress 
-            :percentage="row.progress || 0" 
+          <t-progress
+            :percentage="row.progress || 0"
             :theme="getProgressTheme(row.progress)"
             size="small"
           />
         </template>
 
-        <!-- 指派人列 -->
+        <!-- 执行人/发布人列：显示被分配者（执行人）和发布人（发布者） -->
         <template #assignee="{ row }">
-          <span v-if="row.assignee">{{ row.assignee.full_name || row.assignee.username }}</span>
-          <span v-else class="text-placeholder">未指派</span>
+          <div>
+            <div v-if="row.assignee">{{ row.assignee.full_name || row.assignee.username }}</div>
+            <div class="text-secondary" v-if="row.assigner">发布人: {{ row.assigner.full_name || row.assigner.username }}</div>
+            <div v-else-if="!row.assignee" class="text-placeholder">未指派</div>
+          </div>
         </template>
 
         <!-- 计划时间列 -->
@@ -131,7 +135,7 @@
             >
               编辑
             </t-button>
-            <t-dropdown :options="getActionOptions(row)" @click="onActionClick">
+            <t-dropdown :options="getActionOptions(row)" @click="enhancedOnActionClick">
               <t-button theme="default" variant="text" size="small">
                 更多 ▼
               </t-button>
@@ -171,9 +175,7 @@
           <t-select v-model:value="form.status" :options="statusOptions" style="width:320px" />
         </t-form-item>
 
-        <t-form-item label="进度" v-if="isEditing">
-          <t-input-number v-model:value="form.progress" :min="0" :max="100" />
-        </t-form-item>
+  <!-- progress removed: backend manages progress -->
 
         <t-form-item label="计划开始">
           <t-date-picker v-model:value="form.plan_start_at" enable-time-picker style="width:320px" />
@@ -183,7 +185,7 @@
           <t-date-picker v-model:value="form.plan_end_at" enable-time-picker style="width:320px" />
         </t-form-item>
 
-        <t-form-item label="指派人">
+        <t-form-item label="执行人（被分配者）">
           <UserSelect 
             :model-value="form.assigneeId || undefined" 
             :multiple="false"
@@ -222,20 +224,41 @@
         </t-form-item>
       </t-form>
     </t-dialog>
+
+    <!-- 确认对话框：用于开始/完成/取消等需要确认的操作 -->
+    <t-dialog
+      v-model:visible="showConfirmDialog"
+      header="确认操作"
+      width="420px"
+      @confirm="handleConfirmAction"
+      @cancel="cancelConfirmAction"
+      :confirm-btn="{ loading: isActionLoading }"
+    >
+      <div>{{ confirmMessage }}</div>
+    </t-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { reactive, ref, onMounted, computed } from 'vue'
+import { useAuthStore } from '../stores/auth'
 import { 
   createTask, 
   fetchTasksPaged, 
   updateTask, 
   deleteTask, 
   assignTask, 
+  fetchTaskProgress,
   updateTaskStatus as updateTaskStatusAPI,
-  exportTasks as exportTasksAPI
+  exportTasks as exportTasksAPI,
+  transitionTask
 } from '../api/task'
+import { 
+  submitSubTask, 
+  confirmSubTask, 
+  presignSubtaskAttachment, 
+  confirmSubtaskAttachment
+} from '../api/subtask'
 import { 
   Form, 
   FormItem, 
@@ -275,6 +298,8 @@ const isEditing = ref(false)
 const isSubmitting = ref(false)
 const isAssigning = ref(false)
 const assigningTask = ref<Task | null>(null)
+// 当前正在编辑的原始任务（用于比较字段变更）
+const editingTask = ref<Task | null>(null)
 
 // 表单数据
 const form = reactive<{
@@ -284,7 +309,7 @@ const form = reactive<{
   remarks: string
   priority: number
   status: number
-  progress: number
+  // progress is managed by backend; removed from client editable fields
   scope_json: string
   plan_start_at?: Date
   plan_end_at?: Date
@@ -300,7 +325,7 @@ const form = reactive<{
   remarks: '',
   priority: 1,
   status: 0,
-  progress: 0,
+  // progress removed
   scope_json: '',
   plan_start_at: undefined,
   plan_end_at: undefined,
@@ -395,14 +420,8 @@ const columns = computed(() => [
     cell: 'status'
   },
   {
-    colKey: 'progress',
-    title: '进度',
-    width: 120,
-    cell: 'progress'
-  },
-  {
     colKey: 'assignee',
-    title: '指派人',
+  title: '执行人',
     width: 120,
     cell: 'assignee'
   },
@@ -493,46 +512,47 @@ const getStatusLabel = (status: number) => {
   return labelMap[status] || status.toString()
 }
 
-// 获取进度主题色
+// progress display removed; backend manages progress
 const getProgressTheme = (progress: number) => {
+  if (!progress && progress !== 0) return 'default'
   if (progress < 30) return 'danger'
   if (progress < 70) return 'warning'
   return 'success'
 }
 
-// 获取操作选项
+// 获取操作选项（将 action 与 rowId 编码到 option 对象，避免函数在内部被序列化丢失）
 const getActionOptions = (row: Task) => {
-  const options = [
-    {
-      content: '分配',
-      value: 'assign',
-      onClick: () => assignTaskToUser(row)
-    }
-  ]
-
-  if (row.status !== 3 && row.status !== 4) {  // 非已完成和已取消
-    options.push({
-      content: '标记完成',
-      value: 'complete',
-      onClick: () => updateTaskStatus(row.id!, 3)
-    })
+  const options: any[] = []
+  options.push({ content: '分配', value: 'assign', action: 'assign', rowId: row.id })
+  // 提交子任务与上传资料入口（需要额外输入子任务/附件）
+  options.push({ content: '提交子任务', value: 'submit_subtask', action: 'submit_subtask', rowId: row.id })
+  options.push({ content: '上传资料', value: 'upload_attachment', action: 'upload_attachment', rowId: row.id })
+  if (row.status !== 3 && row.status !== 4) { // 非已完成和已取消
+    options.push({ content: '标记完成', value: 'complete', action: 'complete', rowId: row.id })
   }
-
-  if (row.status !== 4) {  // 非已取消
-    options.push({
-      content: '取消任务',
-      value: 'cancel',
-      onClick: () => updateTaskStatus(row.id!, 4)
-    })
+  if (row.status !== 4) {
+    options.push({ content: '取消任务', value: 'cancel', action: 'cancel', rowId: row.id })
   }
-
-  options.push({
-    content: '删除',
-    value: 'delete',
-    onClick: () => deleteTaskById(row.id!)
-  })
-
+  options.push({ content: '删除', value: 'delete', action: 'delete', rowId: row.id })
   return options
+}
+
+const onTransition = async (id: number, action: string) => {
+  if (!id) {
+    console.warn('onTransition called with invalid id', id, action)
+    notifyError('无效的任务ID')
+    return
+  }
+  try {
+    console.log('transitionTask call', id, action)
+    await transitionTask(id, action)
+    notifySuccess('操作成功')
+    loadTasks()
+  } catch (e) {
+    console.error('transition failed', e)
+    handleError(e)
+    notifyError('操作失败')
+  }
 }
 
 // 加载任务列表
@@ -560,6 +580,21 @@ const loadTasks = async () => {
       if (Array.isArray(response.items)) {
         tasks.value = response.items
         pagination.total = response.total || 0
+        // fetch per-task progress stats in parallel
+        try {
+          await Promise.all(tasks.value.map(async (t: any) => {
+            try {
+              const pr = await fetchTaskProgress(t.id)
+              const rate = pr?.data?.completion_rate ?? 0
+              ;(t as any).progress = Math.round((rate || 0) * 100)
+            } catch (e) {
+              // ignore per-task progress error
+              ;(t as any).progress = 0
+            }
+          }))
+        } catch (e) {
+          // ignore
+        }
       } else if (Array.isArray(response.data)) {
         tasks.value = response.data
         pagination.total = response.total || 0
@@ -630,7 +665,6 @@ const resetForm = () => {
     remarks: '',
     priority: 1,
     status: 0,
-    progress: 0,
     scope_json: '',
     plan_start_at: undefined,
     plan_end_at: undefined,
@@ -642,25 +676,35 @@ const resetForm = () => {
     selectedTags: [],
   })
   isEditing.value = false
+  // 清除正在编辑的原始任务
+  editingTask.value = null
   showCreateDialog.value = false
 }
 
 // 编辑任务
 const editTask = (task: Task) => {
+  console.log('editTask called', task)
   isEditing.value = true
+  // 保存原始任务用于后续比较（比如指派人是否修改）
+  editingTask.value = task
   Object.assign(form, {
     ...task,
     assigneeId: task.assignee_id,
-    selectedMerchants: [],
-    selectedTags: [],
+    // 尝试从后端返回的字段或嵌套对象中提取 merchant/tag id 列表
+    selectedMerchants: (task as any).selectedMerchants || ((task as any).merchants ? (task as any).merchants.map((m: any) => m.id) : []),
+    selectedTags: (task as any).selectedTags || ((task as any).tags ? (task as any).tags.map((t: any) => t.id) : []),
     plan_start_at: task.plan_start_at ? new Date(task.plan_start_at) : undefined,
     plan_end_at: task.plan_end_at ? new Date(task.plan_end_at) : undefined,
   })
+  // 确保 id 显式赋值（支持后端返回不同命名，比如 id / ID / task_id）
+  ;(form as any).id = (task as any).id ?? (task as any).ID ?? (task as any).task_id ?? (task as any).TaskID ?? undefined
   showCreateDialog.value = true
 }
 
 // 提交表单
 const onSubmit = async () => {
+  try { console.log('onSubmit called, isEditing=', isEditing.value, 'form=', JSON.parse(JSON.stringify(form))) } catch (e) { console.log('onSubmit log failed', e) }
+  try { console.log('form.id =', (form as any).id) } catch (e) { }
   const { valid, errors } = validateTaskForm(form)
   if (!valid) {
     const first = Object.values(errors)[0]
@@ -684,20 +728,58 @@ const onSubmit = async () => {
       remarks: form.remarks,
       priority: form.priority,
       status: form.status,
-      progress: form.progress,
       scope_json: form.scope_json,
       plan_start_at: toISOStringOrNull(form.plan_start_at),
       plan_end_at: toISOStringOrNull(form.plan_end_at),
-      assignee_id: form.assigneeId,
       group_id: form.group_id,
     }
-
+    // 主接口不直接包含 assignee；通过 assignTask 单独处理指派以走后端业务逻辑
     if (isEditing.value && form.id) {
-      await updateTask(form.id, payload)
-      notifySuccess('任务更新成功')
+      try {
+        console.log('Updating task payload:', payload)
+        const resp = await updateTask(form.id, payload)
+        console.log('Update response:', resp)
+        notifySuccess('任务更新成功')
+        // 如果指派人发生变化，调用 assignTask
+        const originalAssignee = editingTask.value?.assignee_id ?? null
+        const newAssignee = form.assigneeId ?? null
+        if (originalAssignee !== newAssignee) {
+          try {
+            if (newAssignee === null) {
+              // 若后端支持取消指派，可调用 assignTask with null; 这里仅在选中非空时调用
+            } else {
+              console.log('Calling assignTask after update:', form.id, newAssignee)
+              await assignTask(form.id as number, newAssignee)
+              notifySuccess('指派人已更新')
+            }
+          } catch (e) {
+            console.error('Assign after update failed', e)
+            notifyError('更新后指派失败')
+          }
+        }
+      } catch (err: any) {
+        console.error('Update failed:', err)
+        notifyError('更新失败: ' + (err?.response?.data?.message || err.message || '未知错误'))
+        return
+      }
     } else {
-      const r = await createTask(payload)
-      notifySuccess('任务创建成功: ID = ' + (r.data?.id || ''))
+  const r = await createTask(payload)
+  console.log('Create response:', r)
+  // 后端返回形态不确定：尝试多个路径寻找新创建记录 ID
+  const createdId = r.data?.id ?? r.data?.data?.id ?? r.data?.task?.id ?? r.data?.task_id ?? r.data?.data?.task_id
+  // 如果创建时选择了 assignee，使用 assignTask 完成指派
+  if (createdId && form.assigneeId) {
+        try {
+          console.log('Calling assignTask after create:', createdId, form.assigneeId)
+          await assignTask(createdId, form.assigneeId)
+          notifySuccess('任务创建并分配成功')
+        } catch (e) {
+          console.error('Assign after create failed', e)
+          notifyError('创建后指派失败')
+        }
+      } else {
+        notifySuccess('任务创建成功: ID = ' + (createdId || ''))
+      }
     }
     
     resetForm()
@@ -712,14 +794,19 @@ const onSubmit = async () => {
 // 分配任务
 const assignTaskToUser = (task: Task) => {
   assigningTask.value = task
-  assignForm.assigneeId = task.assignee_id || null
+  // normalize possible nested/alternative fields
+  assignForm.assigneeId = (task as any).assignee_id ?? (task as any).assigneeId ?? null
   showAssignDialog.value = true
 }
 
 // 确认分配
 const onAssignConfirm = async () => {
-  if (!assigningTask.value || !assignForm.assigneeId) {
-    notifyError('请选择指派人')
+  if (!assigningTask.value) {
+    notifyError('无效的任务')
+    return
+  }
+  if (assignForm.assigneeId === null || assignForm.assigneeId === undefined) {
+    notifyError('请选择执行人（被分配者）')
     return
   }
 
@@ -728,7 +815,8 @@ const onAssignConfirm = async () => {
     await assignTask(assigningTask.value.id!, assignForm.assigneeId)
     notifySuccess('任务分配成功')
     showAssignDialog.value = false
-    loadTasks()
+  // refresh
+  await loadTasks()
   } catch (error) {
     handleError(error)
     notifyError('任务分配失败')
@@ -792,15 +880,180 @@ const exportTasks = async () => {
 
 // 操作点击处理
 const onActionClick = ({ data }: { data: any }) => {
-  if (data.onClick) {
-    data.onClick()
+  try {
+    if (!data) return
+    if (data.onClick) {
+      data.onClick()
+      return
+    }
+    // 基于 action 字段分发
+    const action = data.action
+    const id = data.rowId
+    if (!action || !id) return
+    switch (action) {
+      case 'assign':
+        // 找到对应行对象并打开分配对话框
+        const t = tasks.value.find(x => x.id === id)
+        if (t) assignTaskToUser(t)
+        break
+      case 'start':
+      case 'complete':
+      case 'cancel':
+        // 展示确认对话框
+        confirmAction.value = { id, action }
+        confirmMessage.value = action === 'start' ? '确认开始该任务？' : (action === 'complete' ? '确认标记该任务为完成？' : '确认取消该任务？')
+        showConfirmDialog.value = true
+        break
+      case 'delete':
+        deleteTaskById(id)
+        break
+    }
+  } catch (e) {
+    console.error('onActionClick error', e)
   }
+}
+
+// 确认对话框相关状态
+const showConfirmDialog = ref(false)
+const confirmMessage = ref('')
+const confirmAction = ref<{ id: number, action: string } | null>(null)
+const isActionLoading = ref(false)
+
+const handleConfirmAction = async () => {
+  if (!confirmAction.value) return
+  isActionLoading.value = true
+  try {
+    await onTransition(confirmAction.value.id, confirmAction.value.action)
+  } finally {
+    isActionLoading.value = false
+    showConfirmDialog.value = false
+    confirmAction.value = null
+  }
+}
+
+const cancelConfirmAction = () => {
+  showConfirmDialog.value = false
+  confirmAction.value = null
 }
 
 // 页面加载时获取任务列表
 onMounted(() => {
   loadTasks()
 })
+
+const auth = useAuthStore()
+
+// ========== 子任务 & 附件 基本交互 ==========
+const showSubtaskDialog = ref(false)
+const subtaskForm = reactive({
+  taskId: null as number | null,
+  taskMerchantId: null as number | null,
+  merchantId: null as number | null,
+  submitterId: 0,
+  content: '',
+  attachments: [] as Array<{ url: string; type: string; meta_json?: string }>
+})
+
+const openSubmitSubtask = (taskId: number) => {
+  subtaskForm.taskId = taskId
+  subtaskForm.content = ''
+  subtaskForm.attachments = []
+  showSubtaskDialog.value = true
+}
+
+const submitSubtaskHandler = async () => {
+  if (!subtaskForm.taskId) {
+    notifyError('无效的任务ID')
+    return
+  }
+  try {
+    const payload = {
+      task_id: subtaskForm.taskId,
+      content: subtaskForm.content,
+      submitter_id: auth.user?.id || subtaskForm.submitterId || 0,
+      attachments: subtaskForm.attachments
+    }
+    await submitSubTask(payload as any)
+    notifySuccess('子任务提交成功')
+    showSubtaskDialog.value = false
+    loadTasks()
+  } catch (e) {
+    handleError(e)
+    notifyError('提交子任务失败')
+  }
+}
+
+// 简单的附件上传流程（预签名 -> 前端上传 -> 确认）
+const uploadAttachmentForSubtask = async (subtaskId: number, file: File) => {
+  try {
+    const presignReq = {
+      file_name: file.name,
+      size: file.size,
+      mime: file.type || 'application/octet-stream',
+      biz_type: 'attachment'
+    }
+    const presignResp = await presignSubtaskAttachment(subtaskId, presignReq as any)
+    const data = presignResp.data
+    // 执行浏览器端直传（这里假设使用 FormData + fetch）
+    const formData = new FormData()
+    // 预签名返回的 policy/fields 或 headers 取决于后端实现；这里尽量兼容常见 PostPolicy
+    if (data.policy) {
+      // assume PostPolicy fields present
+      Object.keys(data.headers || {}).forEach(k => formData.append(k, data.headers[k]))
+    }
+    formData.append('file', file)
+    // 使用 fetch 上传至 presign host
+    await fetch(data.host, { method: 'POST', body: formData })
+    // 调用确认接口
+    await confirmSubtaskAttachment(subtaskId, {
+      key: data.key,
+      file_name: file.name,
+      size: file.size,
+      mime: file.type || 'application/octet-stream'
+    } as any)
+    notifySuccess('附件上传并确认成功')
+  } catch (e) {
+    handleError(e)
+    notifyError('附件上传失败')
+  }
+}
+
+// 在操作菜单中处理子任务和上传入口
+// extend onActionClick 的 switch
+const origOnActionClick = onActionClick
+const enhancedOnActionClick = (payload: any) => {
+  try {
+    if (!payload || !payload.data) return
+    const data = payload.data
+    if (data.action === 'submit_subtask') {
+      const id = data.rowId
+      if (id) openSubmitSubtask(id)
+      return
+    }
+    if (data.action === 'upload_attachment') {
+      const id = data.rowId
+      if (!id) return
+      // 简单文件选择触发（仅示范）：创建一个隐藏 input
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.onchange = (ev: any) => {
+        const f = ev.target.files && ev.target.files[0]
+        if (f) {
+          // 这里示例将 subtaskId 等于 task id（真实场景应先创建子任务再上传）
+          uploadAttachmentForSubtask(id, f)
+        }
+      }
+      input.click()
+      return
+    }
+    // otherwise fallback to original
+    origOnActionClick(payload)
+  } catch (e) {
+    console.error('enhancedOnActionClick error', e)
+  }
+}
+
+// enhancedOnActionClick 直接暴露供模板使用
 </script>
 
 <style scoped>

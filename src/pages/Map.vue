@@ -13,6 +13,10 @@
             <template #icon><t-icon name="refresh" /></template>
             刷新商户
           </t-button>
+          <t-button size="small" theme="primary" @click="toggleSelectNewMerchant">
+            <template #icon><t-icon name="add" /></template>
+            在地图上选点新增商户
+          </t-button>
         </t-space>
       </template>
       
@@ -31,21 +35,7 @@
               </template>
             </t-input>
           </t-col>
-          <t-col :span="2">
-            <t-select 
-              v-model="filters.city" 
-              placeholder="选择城市"
-              @change="applyFilters"
-              clearable
-            >
-              <t-option
-                v-for="city in availableCities"
-                :key="city"
-                :value="city"
-                :label="city"
-              />
-            </t-select>
-          </t-col>
+          <!-- 城市筛选已移除 -->
           <t-col :span="2">
             <t-select 
               v-model="filters.area" 
@@ -61,21 +51,31 @@
               />
             </t-select>
           </t-col>
-          <t-col :span="3">
-            <t-select 
-              v-model="filters.tags" 
-              placeholder="选择标签"
-              @change="applyFilters"
-              multiple
-              clearable
-            >
-              <t-option
-                v-for="tag in availableTags"
-                :key="tag.id"
-                :value="tag.id"
-                :label="tag.name"
-              />
-            </t-select>
+          <t-col :span="6">
+            <t-row :gutter="8">
+              <t-col :span="12">
+                <!-- 正向：包含所选标签（级联多选） -->
+                <t-cascader
+                  v-model="filters.tags"
+                  :options="tagOptions"
+                  placeholder="包含标签"
+                  @change="applyFilters"
+                  multiple
+                  clearable
+                />
+              </t-col>
+              <t-col :span="12">
+                <!-- 反向：排除所选标签（级联多选） -->
+                <t-cascader
+                  v-model="filters.excludeTagIds"
+                  :options="tagOptions"
+                  placeholder="排除标签"
+                  @change="applyFilters"
+                  multiple
+                  clearable
+                />
+              </t-col>
+            </t-row>
           </t-col>
           <t-col :span="2">
             <t-button @click="clearFilters" variant="outline">
@@ -85,10 +85,6 @@
           </t-col>
           <t-col :span="3">
             <t-space>
-              <t-button @click="fitViewToShowAllMerchants" variant="outline" size="small">
-                <template #icon><t-icon name="view-in-ar" /></template>
-                显示所有商户
-              </t-button>
               <t-button @click="resetMapView" variant="outline" size="small">
                 <template #icon><t-icon name="refresh" /></template>
                 重置视野
@@ -233,13 +229,51 @@
           </div>
         </div>
       </div>
+      <!-- 地图选点创建商户弹窗 -->
+  <t-dialog v-model:visible="showCreateModal" title="在地图上创建商户" width="560px" :confirm-loading="createSubmitting" @confirm="submitCreateForm" @cancel="handleCreateCancel">
+        <t-form ref="createFormRef" :data="createFormData">
+          <t-row :gutter="12">
+            <t-col :span="12">
+              <t-form-item label="法人姓名">
+                <t-input v-model="createFormData.legal_name" placeholder="请输入法人姓名" />
+              </t-form-item>
+            </t-col>
+            <t-col :span="12">
+              <t-form-item label="联系电话">
+                <t-input v-model="createFormData.phone" placeholder="请输入联系电话" />
+              </t-form-item>
+            </t-col>
+          </t-row>
+          <t-form-item label="详细地址">
+            <t-textarea v-model="createFormData.address" :autosize="{ minRows: 2, maxRows: 4 }" />
+          </t-form-item>
+          <t-row :gutter="12">
+            <t-col :span="12">
+              <t-form-item label="经度">
+                <t-input v-model="createFormData.lng" readonly />
+              </t-form-item>
+            </t-col>
+            <t-col :span="12">
+              <t-form-item label="纬度">
+                <t-input v-model="createFormData.lat" readonly />
+              </t-form-item>
+            </t-col>
+          </t-row>
+          <t-form-item label="关联标签">
+            <tag-select v-model="createFormData.tags" />
+          </t-form-item>
+        </t-form>
+      </t-dialog>
     </t-card>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
+import TagSelect from '../components/Selectors/TagSelect.vue'
+import { createMerchant } from '../api/merchant'
 import { loadAMap, DEFAULT_MAP_OPTIONS } from '../utils/amap'
 import { fetchMerchants } from '../api/merchant'
 import { fetchTags } from '../api/tag'
@@ -248,6 +282,29 @@ import type { Merchant, Tag } from '../types'
 // 地图相关数据
 const mapContainer = ref<HTMLElement>()
 const map = ref<any>(null)
+const router = useRouter()
+const isSelectingNewMerchant = ref(false)
+const tempNewMarker = ref<any>(null)
+// 鼠标跟随的临时图标元素（用于提示用户当前处于选点模式）
+const cursorIconEl = ref<HTMLElement | null>(null)
+let _mouseMoveHandler: ((e: MouseEvent) => void) | null = null
+// 新增表单状态
+const showCreateModal = ref(false)
+const createFormRef = ref()
+const createSubmitting = ref(false)
+const createFormData = ref<any>({
+  legal_name: '',
+  phone: '',
+  address: '',
+  city: '',
+  area: '',
+  lng: null,
+  lat: null,
+  geocode_level: '',
+  geocode_score: null,
+  geocode_description: '',
+  tags: [] as number[]
+})
 
 // 商户图标配置函数 - 使用官方推荐的自定义内容方式
 const getMerchantMarkerContent = (merchant: any, isSelected = false, isHighlighted = false) => {
@@ -287,38 +344,32 @@ const getMerchantMarkerContent = (merchant: any, isSelected = false, isHighlight
   }
   
   // 使用官方推荐的自定义HTML内容方式
+  // 生成内联 SVG，避免外部图片加载问题
+  const svg = buildMarkerSvg(bgColor, size)
+
   return `
     <div class="custom-merchant-marker" style="
       position: relative;
       width: ${size}px;
       height: ${size}px;
       cursor: pointer;
+      display: inline-block;
     ">
-      <img src="${iconUrl}" style="
-        width: 100%;
-        height: 100%;
-        display: block;
-      " alt="${merchant.address}" />
-      <div class="merchant-label" style="
-        position: absolute;
-        top: -25px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: ${bgColor};
-        color: ${textColor};
-        padding: 2px 6px;
-        border-radius: 10px;
-        font-size: 11px;
-        white-space: nowrap;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-        max-width: 120px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        ${isHighlighted || isSelected ? 'display: block;' : 'display: none;'}
-      ">
-        ${merchant.address}
-      </div>
+  ${svg}
     </div>
+  `
+}
+
+// 生成给定形状的标记 SVG（使用你提供的 path），color 为主体颜色，size 为宽度像素
+const buildMarkerSvg = (color: string, size = 32) => {
+  // 原始 viewBox 为 40x60，height = size * 1.5（按比例缩放）
+  const width = size
+  const height = Math.round(size * 1.5)
+  return `
+    <svg width="${width}" height="${height}" viewBox="0 0 40 60" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:block;">
+      <path d="M20 0C9.9 0 2 8 2 18.2C2 28.5 20 60 20 60C20 60 38 28.5 38 18.2C38 8 30.1 0 20 0Z" fill="${color}" />
+      <circle cx="20" cy="18" r="8" fill="white" />
+    </svg>
   `
 }
 
@@ -330,8 +381,7 @@ const createMerchantMarker = (merchant: any, AMap: any) => {
   const marker = new AMap.Marker({
     position: position,
     content: getMerchantMarkerContent(merchant),
-    offset: new AMap.Pixel(-16, -32), // 官方推荐的偏移量，让图标底部中心对准坐标点
-    title: merchant.address,
+  offset: new AMap.Pixel(-16, -48), // 调整偏移以匹配 32x48 svg 标记底部尖端
     extData: merchant // 将商户数据存储在标记中，方便后续使用
   })
   
@@ -344,9 +394,9 @@ const availableTags = ref<Tag[]>([])
 // 筛选相关数据
 const filters = ref({
   keyword: '',
-  city: '',
   area: '',
-  tags: [] as number[]
+  tags: [] as number[],
+  excludeTagIds: [] as number[]
 })
 
 // 列表面板和多选相关数据
@@ -354,13 +404,7 @@ const isListCollapsed = ref(false)
 const selectedMerchants = ref<number[]>([])
 const selectedMarkers = ref<any[]>([])
 
-// 计算属性：获取可用的城市列表
-const availableCities = computed(() => {
-  const cities = merchants.value
-    .map(m => m.city)
-    .filter((city): city is string => Boolean(city))
-  return [...new Set(cities)].sort()
-})
+// 城市过滤已移除 — 保留区域过滤
 
 // 计算属性：获取可用的区域列表
 const availableAreas = computed(() => {
@@ -368,6 +412,76 @@ const availableAreas = computed(() => {
     .map(m => m.area)
     .filter((area): area is string => Boolean(area))
   return [...new Set(areas)].sort()
+})
+
+// 计算属性：将平铺的标签列表转换为级联选择的 options
+// 说明/假设：标签对象可能包含字段 `category` 或 `type` 来表示其所属分类。
+// 我们优先读取这两个字段进行分组；没有分类的标签会被归为 '其他' 分组。
+const tagOptions = computed(() => {
+  const tags = availableTags.value || []
+
+  // 根据可能的分类字段分组
+  const groupMap: Record<string, { label: string; value: string; children: { label: string; value: number }[] }> = {}
+
+  for (const tag of tags) {
+    // use backend-mapped `class` field first (see src/api/tag.ts mapping),
+    // then fall back to `category`, otherwise put into '其他'
+    const cat = (tag as any).class || (tag as any).category || '其他'
+    const key = String(cat || '其他')
+    if (!groupMap[key]) {
+      groupMap[key] = { label: key, value: key, children: [] }
+    }
+    // 子项使用 tag.id 作为 value，保持和原来 filters.tags 类型 compatible（number[]）
+    groupMap[key].children.push({ label: tag.name, value: tag.id })
+  }
+
+  // 将分组转换为 cascader 的 options 数组
+  const groups = Object.values(groupMap)
+
+  // 如果只有一个分组并且分组名为 '其他'，直接返回其子项作为顶层
+  if (groups.length === 1 && groups[0].value === '其他') {
+    return [
+      {
+        label: '全部标签',
+        value: 'all',
+        children: groups[0].children
+      }
+    ]
+  }
+
+  return groups
+})
+
+// 计算属性：将 cascader 返回的选择值（可能包含分组 value）规范化为 tag id 的数组
+const selectedIncludeTagIds = computed(() => {
+  const raw = filters.value.tags as any[]
+  if (!raw || raw.length === 0) return [] as number[]
+
+  // cascader 的 multiple 模式下，选中的值可能是 tag id（number）或路径数组；我们提取所有数字值
+  const ids: number[] = []
+  const collect = (item: any) => {
+    if (item == null) return
+    if (typeof item === 'number') ids.push(item)
+    else if (Array.isArray(item)) item.forEach(collect)
+    else if (typeof item === 'string' && !isNaN(Number(item))) ids.push(Number(item))
+  }
+  raw.forEach(collect)
+  return [...new Set(ids)]
+})
+
+const selectedExcludeTagIds = computed(() => {
+  const raw = filters.value.excludeTagIds as any[]
+  if (!raw || raw.length === 0) return [] as number[]
+
+  const ids: number[] = []
+  const collect = (item: any) => {
+    if (item == null) return
+    if (typeof item === 'number') ids.push(item)
+    else if (Array.isArray(item)) item.forEach(collect)
+    else if (typeof item === 'string' && !isNaN(Number(item))) ids.push(Number(item))
+  }
+  raw.forEach(collect)
+  return [...new Set(ids)]
 })
 
 // 计算属性：筛选后的商户列表
@@ -381,23 +495,29 @@ const filteredMerchants = computed(() => {
       if (!matchName && !matchAddress) return false
     }
 
-    // 城市筛选
-    if (filters.value.city && merchant.city !== filters.value.city) {
-      return false
-    }
+  // （已移除城市筛选）
 
     // 区域筛选
     if (filters.value.area && merchant.area !== filters.value.area) {
       return false
     }
 
-    // 标签筛选
-    if (filters.value.tags.length > 0 && merchant.tags) {
-      const merchantTags = merchant.tags
-      const hasMatchingTag = filters.value.tags.some(tagId => 
-        merchantTags.includes(tagId)
-      )
-      if (!hasMatchingTag) return false
+    // 标签筛选：同时支持包含（tags）和排除（excludeTagIds）列表
+    const includeTags = selectedIncludeTagIds.value || []
+    const excludeTags = selectedExcludeTagIds.value || []
+
+    // 如果有包含标签，商户必须包含至少一个包含标签
+    if (includeTags.length > 0) {
+      const merchantTags = merchant.tags || []
+      const hasInclude = includeTags.some(tagId => merchantTags.includes(tagId))
+      if (!hasInclude) return false
+    }
+
+    // 如果有排除标签，商户不能包含任一排除标签
+    if (excludeTags.length > 0) {
+      const merchantTags = merchant.tags || []
+      const hasExclude = excludeTags.some(tagId => merchantTags.includes(tagId))
+      if (hasExclude) return false
     }
 
     return true
@@ -450,6 +570,45 @@ const initMap = async () => {
       loadTags(),
       loadMerchants()
     ])
+
+    // 地图点击用于选点新增商户（仅在选点模式开启时）
+    map.value.on('click', (e: any) => {
+      try {
+        if (!isSelectingNewMerchant.value) return
+        const lng = e.lnglat.lng || (e.lnglat as any)[0]
+        const lat = e.lnglat.lat || (e.lnglat as any)[1]
+
+        // 移除已有临时标记
+        if (tempNewMarker.value) {
+          map.value.remove(tempNewMarker.value)
+          tempNewMarker.value = null
+        }
+
+        // 创建临时高亮标记
+        const AMap = (window as any).AMap
+        const position = new AMap.LngLat(lng, lat)
+        const marker = new AMap.Marker({
+          position,
+          content: `
+            <div class="custom-merchant-marker" style="width:32px;height:48px;">
+              ${buildMarkerSvg('#FFD700', 32)}
+            </div>
+          `,
+          offset: new AMap.Pixel(-16, -48)
+        })
+        map.value.add(marker)
+        tempNewMarker.value = marker
+
+  // 在本页打开创建弹窗并传入经纬度
+  openCreateModalWithCoords(lng, lat)
+  // 退出选点模式
+  isSelectingNewMerchant.value = false
+  // 关闭鼠标跟随图标
+  disableSelectCursor()
+      } catch (err) {
+        console.error('选点失败', err)
+      }
+    })
 
     MessagePlugin.success('地图加载成功')
   } catch (error) {
@@ -545,54 +704,26 @@ const applyFilters = async () => {
 const clearFilters = async () => {
   filters.value = {
     keyword: '',
-    city: '',
     area: '',
-    tags: []
+    tags: [],
+    excludeTagIds: []
   }
   await addMerchantMarkers()
 }
 
-// 调整地图视野以显示所有商户
-const fitViewToShowAllMerchants = async () => {
-  if (!map.value || filteredMerchants.value.length === 0) return
-  
-  try {
-    const AMap = await loadAMap()
-    const validMerchants = filteredMerchants.value.filter(m => m.lng && m.lat)
-    
-    if (validMerchants.length === 0) {
-      MessagePlugin.warning('没有包含坐标信息的商户')
-      return
-    }
-
-    if (validMerchants.length === 1) {
-      // 只有一个商户时，以该商户为中心，设置合适的缩放级别
-      const merchant = validMerchants[0]
-      const targetPosition = new AMap.LngLat(merchant.lng!, merchant.lat!)
-      map.value.setZoomAndCenter(14, targetPosition, false)
-      MessagePlugin.success('已定位到商户位置')
-    } else {
-      // 多个商户时，使用官方方法计算最佳视野
-      const bounds = new AMap.Bounds()
-      validMerchants.forEach(merchant => {
-        bounds.extend(new AMap.LngLat(merchant.lng!, merchant.lat!))
-      })
-      
-      // 设置地图视野以包含所有商户，限制缩放级别范围
-      map.value.setBounds(bounds, false, [80, 80, 80, 80], 15, 8) // 最大缩放15，最小缩放8
-      MessagePlugin.success(`已调整视野显示所有 ${validMerchants.length} 个商户`)
-    }
-  } catch (error) {
-    console.error('调整地图视野失败:', error)
-    MessagePlugin.error('调整地图视野失败')
-  }
-}
+// ...existing code...
 
 // 重置地图到默认视野
 const resetMapView = async () => {
   if (!map.value) return
   
   try {
+    // 清理可能残留的临时选点标记，避免在重绘时出现残留
+    if (tempNewMarker.value && map.value) {
+      try { map.value.remove(tempNewMarker.value) } catch (e) { /* ignore */ }
+      tempNewMarker.value = null
+    }
+
     const AMap = await loadAMap()
     const defaultCenter = new AMap.LngLat(114.392480, 36.098779)
     map.value.setZoomAndCenter(12, defaultCenter, false)
@@ -606,6 +737,144 @@ const resetMapView = async () => {
 // 列表面板控制方法
 const toggleListPanel = () => {
   isListCollapsed.value = !isListCollapsed.value
+}
+
+// 切换地图选点新增商户模式
+const toggleSelectNewMerchant = () => {
+  isSelectingNewMerchant.value = !isSelectingNewMerchant.value
+  if (!isSelectingNewMerchant.value && tempNewMarker.value && map.value) {
+    try { map.value.remove(tempNewMarker.value) } catch (e) { /* ignore */ }
+    tempNewMarker.value = null
+  }
+  // 开启/关闭鼠标跟随图标以提示用户
+  if (isSelectingNewMerchant.value) {
+    enableSelectCursor()
+  } else {
+    disableSelectCursor()
+  }
+
+  MessagePlugin.info(isSelectingNewMerchant.value ? '请在地图上点击选点以创建新商户' : '已取消选点模式')
+}
+
+// 创建并启用一个跟随鼠标的图标，方便用户察觉处于选点模式
+const enableSelectCursor = () => {
+  // 避免重复创建
+  if (cursorIconEl.value) return
+
+  // 创建 DOM 元素并附加到地图容器上层
+  const el = document.createElement('div')
+  el.className = 'select-cursor-icon'
+  el.style.position = 'absolute'
+  el.style.pointerEvents = 'none'
+  el.style.zIndex = '2000'
+  // 使用与地图标记同样的水滴形 SVG，但尺寸更小以作为鼠标提示
+  const cursorSvg = buildMarkerSvg('#ff4d4f', 28)
+  el.innerHTML = cursorSvg
+  // 为元素设定与 svg 相匹配的尺寸（宽28，高约42）
+  el.style.width = '28px'
+  el.style.height = '42px'
+
+  const container = document.getElementById('amap-container')
+  if (container) {
+    // 确保容器有定位上下文（不会破坏地图渲染）
+    const computed = window.getComputedStyle(container)
+    if (computed.position === 'static' || !computed.position) {
+      container.style.position = 'relative'
+    }
+
+    // 保证图标位于地图最上层
+    el.style.zIndex = '99999'
+    el.style.transform = 'translate(-50%, -50%)'
+    el.style.display = 'block'
+
+    container.appendChild(el)
+    cursorIconEl.value = el
+
+    // 鼠标移动时更新位置，使用容器边界做为基准
+    _mouseMoveHandler = (e: MouseEvent) => {
+      const rect = container.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      // 保证坐标为数字
+      el.style.left = `${Math.round(x)}px`
+      el.style.top = `${Math.round(y)}px`
+    }
+    // 绑定到文档以保证在地图拖拽时也能跟随
+    document.addEventListener('mousemove', _mouseMoveHandler)
+  }
+}
+
+const disableSelectCursor = () => {
+  if (cursorIconEl.value) {
+    try {
+      cursorIconEl.value.remove()
+    } catch (e) { /* ignore */ }
+    cursorIconEl.value = null
+  }
+  if (_mouseMoveHandler) {
+    document.removeEventListener('mousemove', _mouseMoveHandler)
+    _mouseMoveHandler = null
+  }
+}
+
+// 打开创建弹窗并填充坐标
+const openCreateModalWithCoords = (lng: number, lat: number) => {
+  createFormData.value = {
+    legal_name: '',
+    phone: '',
+    address: '',
+    city: '',
+    area: '',
+    lng,
+    lat,
+    geocode_level: 'precise',
+    geocode_score: 90,
+    geocode_description: '精确定位（用户手动选点）',
+    tags: []
+  }
+  showCreateModal.value = true
+}
+
+// 提交创建表单
+const submitCreateForm = async () => {
+  try {
+    createSubmitting.value = true
+    // 简单校验
+    if (!createFormData.value.legal_name || !createFormData.value.address) {
+      MessagePlugin.warning('请填写法人姓名和详细地址')
+      createSubmitting.value = false
+      return
+    }
+
+    const payload = { ...createFormData.value }
+    await createMerchant(payload)
+    MessagePlugin.success('已创建商户（来自地图选点）')
+    showCreateModal.value = false
+    // 创建成功后移除临时标记并退出选点模式
+    if (tempNewMarker.value && map.value) {
+      try { map.value.remove(tempNewMarker.value) } catch (e) { /* ignore */ }
+      tempNewMarker.value = null
+    }
+    isSelectingNewMerchant.value = false
+    // 重新加载商户并刷新标注
+    await loadMerchants()
+  } catch (err: any) {
+    console.error('创建商户失败', err)
+    MessagePlugin.error(err?.message || '创建商户失败')
+  } finally {
+    createSubmitting.value = false
+  }
+}
+
+// 取消创建弹窗时的清理逻辑
+const handleCreateCancel = () => {
+  showCreateModal.value = false
+  // 移除临时标记并退出选点模式
+  if (tempNewMarker.value && map.value) {
+    try { map.value.remove(tempNewMarker.value) } catch (e) { /* ignore */ }
+    tempNewMarker.value = null
+  }
+  isSelectingNewMerchant.value = false
 }
 
 // 商户多选相关方法
@@ -757,9 +1026,8 @@ const locateOnMap = async (merchant: Merchant) => {
       // 如果没找到对应的标记，创建一个临时标记
       const tempMarker = new AMap.Marker({
         position: targetPosition,
-        content: getMerchantMarkerContent(merchant, false, true), // 使用高亮内容
-        offset: new AMap.Pixel(-16, -32),
-        title: merchant.address
+  content: getMerchantMarkerContent(merchant, false, true), // 使用高亮内容
+  offset: new AMap.Pixel(-20, -60)
       })
       
       map.value.add(tempMarker)
@@ -962,6 +1230,8 @@ onUnmounted(() => {
       console.error('地图组件清理时出错:', error)
     }
   }
+  // 清理鼠标跟随图标
+  try { disableSelectCursor() } catch (e) { /* ignore */ }
 })
 </script>
 
@@ -1297,4 +1567,16 @@ onUnmounted(() => {
   font-weight: 600;
   margin-bottom: 8px;
 }
+
+/* 选点时鼠标跟随的图标 */
+.select-cursor-icon {
+  width: 28px;
+  height: 42px;
+  transform: translate(-50%, -50%);
+  transition: transform 0.08s linear;
+  will-change: left, top;
+}
+
+
+/* marker fallback removed */
 </style>
