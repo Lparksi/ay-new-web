@@ -24,6 +24,8 @@ export interface User {
   id: number
   username: string
   full_name?: string
+  email?: string
+  phone?: string
   active?: boolean
   role?: string // 向后兼容的单角色字段
   roles?: Role[] // 多角色支持
@@ -80,6 +82,59 @@ export interface Task {
   assigner?: User
   assignee?: User
   progress?: number
+  created_at?: string
+  updated_at?: string
+}
+
+export interface TaskMerchant {
+  id: number
+  task_id: number
+  merchant_id: number
+  assigned_to?: number | null
+  sequence?: number | null
+  target_subtask_count: number
+  completed_subtask_count: number
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled'
+  last_submit_at?: string | null
+  notes?: string
+  created_at?: string
+  updated_at?: string
+  // 关联数据
+  task?: Task
+  merchant?: Merchant
+  assignee?: User
+}
+
+export interface SubTask {
+  id?: number
+  task_id: number
+  task_merchant_id?: number | null
+  merchant_id?: number | null
+  submitter_id: number
+  content?: string
+  client_mark?: 'completed' | 'failed' | 'other'
+  confirmed_as_done: boolean
+  submitted_at: string
+  geo_point_id?: number | null
+  created_at?: string
+  updated_at?: string
+  // 关联数据
+  task?: Task
+  task_merchant?: TaskMerchant
+  merchant?: Merchant
+  submitter?: User
+  attachments?: SubTaskAttachment[]
+}
+
+export interface SubTaskAttachment {
+  id: number
+  subtask_id: number
+  file_name: string
+  size: number
+  mime: string
+  url: string
+  expire_at?: number
+  etag?: string
   created_at?: string
   updated_at?: string
 }

@@ -32,53 +32,26 @@
     </div>
 
     <!-- 用户列表 -->
-    <user-list 
-      :users="users" 
-      :loading="loading"
-      :pagination="pagination"
-      @edit="onEdit" 
-      @view="onView"
-      @delete="onDeleteClick"
-      @batch-delete="onBatchDeleteClick"
-      @search="onSearch"
-      @page-change="onPageChange"
-    />
+    <user-list :users="users" :loading="loading" :pagination="pagination" @edit="onEdit" @view="onView"
+      @delete="onDeleteClick" @batch-delete="onBatchDeleteClick" @search="onSearch" @page-change="onPageChange" />
 
     <!-- 用户表单对话框 -->
-    <user-form 
-      v-model:visible="formVisible"
-      :modelValue="editingUser" 
-      @created="onCreate" 
-      @updated="onUpdate" 
-      @cancel="onCancelEdit" 
-    />
+    <user-form v-model:visible="formVisible" :modelValue="editingUser" @created="onCreate" @updated="onUpdate"
+      @cancel="onCancelEdit" />
 
     <!-- 用户详情对话框 -->
-    <user-detail
-      v-model:visible="detailVisible"
-      :user="viewingUser"
-    />
+    <user-detail v-model:visible="detailVisible" :user="viewingUser" />
 
     <!-- 删除确认对话框 -->
-    <t-dialog
-      v-model:visible="deleteDialogVisible"
-      header="确认删除"
-      theme="warning"
-      @confirm="onConfirmDelete"
-      @cancel="onCancelDelete"
-    >
+    <t-dialog v-model:visible="deleteDialogVisible" header="确认删除" theme="warning" @confirm="onConfirmDelete"
+      @cancel="onCancelDelete">
       <p>确定要删除用户 <strong>{{ deletingUser?.username }}</strong> 吗？</p>
       <p class="warning-text">此操作不可撤销，请谨慎操作。</p>
     </t-dialog>
 
     <!-- 批量删除确认对话框 -->
-    <t-dialog
-      v-model:visible="batchDeleteDialogVisible"
-      header="确认批量删除"
-      theme="warning"
-      @confirm="onConfirmBatchDelete"
-      @cancel="onCancelBatchDelete"
-    >
+    <t-dialog v-model:visible="batchDeleteDialogVisible" header="确认批量删除" theme="warning" @confirm="onConfirmBatchDelete"
+      @cancel="onCancelBatchDelete">
       <p>确定要删除选中的 <strong>{{ deletingUserIds.length }}</strong> 个用户吗？</p>
       <p class="warning-text">此操作不可撤销，请谨慎操作。</p>
     </t-dialog>
@@ -128,7 +101,7 @@ const pagination = reactive({
 async function load() {
   try {
     loading.value = true
-    
+
     const params = {
       page: pagination.current,
       pageSize: pagination.pageSize,
@@ -136,7 +109,7 @@ async function load() {
     }
 
     const resp = await fetchUsers(params)
-    
+
     // 处理响应数据
     if (resp && typeof resp === 'object' && 'items' in resp) {
       // 确保每个用户对象都是有效的
@@ -244,7 +217,7 @@ function onBatchDeleteClick(ids: (number | string)[]) {
 
 async function onConfirmDelete() {
   if (!deletingUser.value) return
-  
+
   try {
     await deleteUser(deletingUser.value.id)
     deleteDialogVisible.value = false
@@ -264,7 +237,7 @@ function onCancelDelete() {
 
 async function onConfirmBatchDelete() {
   if (deletingUserIds.value.length === 0) return
-  
+
   try {
     // 批量删除用户
     await Promise.all(deletingUserIds.value.map(id => deleteUser(id)))

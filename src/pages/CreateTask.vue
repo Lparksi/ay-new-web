@@ -17,47 +17,23 @@
     <div class="filters">
       <t-row :gutter="16">
         <t-col :span="4">
-          <t-input 
-            v-model:value="filters.search" 
-            placeholder="搜索任务名称" 
-            @change="onSearch"
-            clearable
-          />
+          <t-input v-model:value="filters.search" placeholder="搜索任务名称" @change="onSearch" clearable />
         </t-col>
         <t-col :span="3">
-          <t-select 
-            v-model:value="filters.type" 
-            :options="typeOptions"
-            placeholder="任务类型"
-            clearable
-            @change="onFilter"
-          />
+          <t-select v-model:value="filters.type" :options="typeOptions" placeholder="任务类型" clearable
+            @change="onFilter" />
         </t-col>
         <t-col :span="3">
-          <t-select 
-            v-model:value="filters.status" 
-            :options="statusOptions"
-            placeholder="任务状态"
-            clearable
-            @change="onFilter"
-          />
+          <t-select v-model:value="filters.status" :options="statusOptions" placeholder="任务状态" clearable
+            @change="onFilter" />
         </t-col>
         <t-col :span="3">
-          <t-select 
-            v-model:value="filters.priority" 
-            :options="priorityOptions"
-            placeholder="优先级"
-            clearable
-            @change="onFilter"
-          />
+          <t-select v-model:value="filters.priority" :options="priorityOptions" placeholder="优先级" clearable
+            @change="onFilter" />
         </t-col>
         <t-col :span="4">
-          <UserSelect 
-            :model-value="filters.assigneeId || undefined" 
-            :multiple="false" 
-            placeholder="执行人（被分配者）"
-            @update:model-value="(val: any) => { filters.assigneeId = val; onFilter() }"
-          />
+          <UserSelect :model-value="filters.assigneeId || undefined" :multiple="false" placeholder="执行人（被分配者）"
+            @update:model-value="(val: any) => { filters.assigneeId = val; onFilter() }" />
         </t-col>
         <t-col :span="3">
           <t-button @click="resetFilters">重置</t-button>
@@ -67,16 +43,8 @@
 
     <!-- 任务列表表格 -->
     <div class="table-container">
-      <t-table
-        :data="tasks"
-        :columns="columns"
-        :loading="loading"
-        :pagination="pagination"
-        @page-change="onPageChange"
-        @page-size-change="onPageSizeChange"
-        row-key="id"
-        stripe
-      >
+      <t-table :data="tasks" :columns="columns" :loading="loading" :pagination="pagination" @page-change="onPageChange"
+        @page-size-change="onPageSizeChange" row-key="id" stripe>
         <!-- 任务类型列 -->
         <template #type="{ row }">
           <t-tag :theme="getTypeTheme(row.type)">{{ getTypeLabel(row.type) }}</t-tag>
@@ -96,21 +64,18 @@
           </t-tag>
         </template>
 
-  <!-- progress removed: managed by backend -->
+        <!-- progress removed: managed by backend -->
         <!-- 只读进度列 -->
         <template #progress="{ row }">
-          <t-progress
-            :percentage="row.progress || 0"
-            :theme="getProgressTheme(row.progress)"
-            size="small"
-          />
+          <t-progress :percentage="row.progress || 0" :theme="getProgressTheme(row.progress)" size="small" />
         </template>
 
         <!-- 执行人/发布人列：显示被分配者（执行人）和发布人（发布者） -->
         <template #assignee="{ row }">
           <div>
             <div v-if="row.assignee">{{ row.assignee.full_name || row.assignee.username }}</div>
-            <div class="text-secondary" v-if="row.assigner">发布人: {{ row.assigner.full_name || row.assigner.username }}</div>
+            <div class="text-secondary" v-if="row.assigner">发布人: {{ row.assigner.full_name || row.assigner.username }}
+            </div>
             <div v-else-if="!row.assignee" class="text-placeholder">未指派</div>
           </div>
         </template>
@@ -127,12 +92,7 @@
         <!-- 操作列 -->
         <template #actions="{ row }">
           <t-space>
-            <t-button 
-              theme="primary" 
-              variant="text" 
-              size="small"
-              @click="editTask(row)"
-            >
+            <t-button theme="primary" variant="text" size="small" @click="editTask(row)">
               编辑
             </t-button>
             <t-dropdown :options="getActionOptions(row)" @click="enhancedOnActionClick">
@@ -146,14 +106,8 @@
     </div>
 
     <!-- 新建/编辑任务对话框 -->
-    <t-dialog
-      v-model:visible="showCreateDialog"
-      :header="isEditing ? '编辑任务' : '新建任务'"
-      width="800px"
-      @confirm="onSubmit"
-      @cancel="resetForm"
-      :confirm-btn="{ loading: isSubmitting }"
-    >
+    <t-dialog v-model:visible="showCreateDialog" :header="isEditing ? '编辑任务' : '新建任务'" width="800px" @confirm="onSubmit"
+      @cancel="resetForm" :confirm-btn="{ loading: isSubmitting }">
       <t-form label-width="120px" v-model:value="form" ref="formRef">
         <t-form-item label="任务类型" name="type">
           <t-select v-model:value="form.type" :options="typeOptions" style="width:320px" />
@@ -175,7 +129,7 @@
           <t-select v-model:value="form.status" :options="statusOptions" style="width:320px" />
         </t-form-item>
 
-  <!-- progress removed: backend manages progress -->
+        <!-- progress removed: backend manages progress -->
 
         <t-form-item label="计划开始">
           <t-date-picker v-model:value="form.plan_start_at" enable-time-picker style="width:320px" />
@@ -186,15 +140,12 @@
         </t-form-item>
 
         <t-form-item label="执行人（被分配者）">
-          <UserSelect 
-            :model-value="form.assigneeId || undefined" 
-            :multiple="false"
-            @update:model-value="(val: any) => form.assigneeId = val"
-          />
+          <UserSelect :model-value="form.assigneeId || undefined" :multiple="false"
+            @update:model-value="(val: any) => form.assigneeId = val" />
         </t-form-item>
-        
+
         <t-form-item label="商户">
-          <MerchantSelect v-model="form.selectedMerchants" />
+          <MerchantSelect ref="merchantSelectRef" v-model="form.selectedMerchants" />
         </t-form-item>
 
         <t-form-item label="标签">
@@ -204,36 +155,22 @@
     </t-dialog>
 
     <!-- 分配任务对话框 -->
-    <t-dialog
-      v-model:visible="showAssignDialog"
-      header="分配任务"
-      width="400px"
-      @confirm="onAssignConfirm"
-      :confirm-btn="{ loading: isAssigning }"
-    >
+    <t-dialog v-model:visible="showAssignDialog" header="分配任务" width="400px" @confirm="onAssignConfirm"
+      :confirm-btn="{ loading: isAssigning }">
       <t-form label-width="80px">
         <t-form-item label="任务">
           <span>{{ assigningTask?.task_name }}</span>
         </t-form-item>
         <t-form-item label="指派给">
-          <UserSelect 
-            :model-value="assignForm.assigneeId || undefined" 
-            :multiple="false"
-            @update:model-value="(val: any) => assignForm.assigneeId = val"
-          />
+          <UserSelect :model-value="assignForm.assigneeId || undefined" :multiple="false"
+            @update:model-value="(val: any) => assignForm.assigneeId = val" />
         </t-form-item>
       </t-form>
     </t-dialog>
 
     <!-- 确认对话框：用于开始/完成/取消等需要确认的操作 -->
-    <t-dialog
-      v-model:visible="showConfirmDialog"
-      header="确认操作"
-      width="420px"
-      @confirm="handleConfirmAction"
-      @cancel="cancelConfirmAction"
-      :confirm-btn="{ loading: isActionLoading }"
-    >
+    <t-dialog v-model:visible="showConfirmDialog" header="确认操作" width="420px" @confirm="handleConfirmAction"
+      @cancel="cancelConfirmAction" :confirm-btn="{ loading: isActionLoading }">
       <div>{{ confirmMessage }}</div>
     </t-dialog>
   </div>
@@ -242,31 +179,32 @@
 <script setup lang="ts">
 import { reactive, ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
-import { 
-  createTask, 
-  fetchTasksPaged, 
-  updateTask, 
-  deleteTask, 
-  assignTask, 
+import {
+  createTask,
+  fetchTasksPaged,
+  updateTask,
+  deleteTask,
+  assignTask,
   fetchTaskProgress,
   updateTaskStatus as updateTaskStatusAPI,
   exportTasks as exportTasksAPI,
   transitionTask
 } from '../api/task'
-import { 
-  submitSubTask, 
-  confirmSubTask, 
-  presignSubtaskAttachment, 
+import { generateTaskMerchants } from '../api/task'
+import {
+  submitSubTask,
+  confirmSubTask,
+  presignSubtaskAttachment,
   confirmSubtaskAttachment
 } from '../api/subtask'
-import { 
-  Form, 
-  FormItem, 
-  Input, 
-  Textarea, 
-  Button, 
-  Select, 
-  InputNumber, 
+import {
+  Form,
+  FormItem,
+  Input,
+  Textarea,
+  Button,
+  Select,
+  InputNumber,
   DatePicker,
   Table,
   Dialog,
@@ -341,6 +279,9 @@ const form = reactive<{
 const assignForm = reactive({
   assigneeId: null as number | null
 })
+
+// ref to access MerchantSelect component instance for fallback sync
+const merchantSelectRef = ref<HTMLElement | any>(null)
 
 // 筛选条件
 const filters = reactive({
@@ -421,7 +362,7 @@ const columns = computed(() => [
   },
   {
     colKey: 'assignee',
-  title: '执行人',
+    title: '执行人',
     width: 120,
     cell: 'assignee'
   },
@@ -430,6 +371,26 @@ const columns = computed(() => [
     title: '计划时间',
     width: 180,
     cell: 'planTime'
+  },
+  {
+    colKey: 'merchants',
+    title: '商户',
+    width: 240,
+    cell: (h: any, { row }: any) => {
+      try {
+        const list = (row as any).merchants || (row as any).selectedMerchants || []
+        if (!list) return '-'
+        const names = (Array.isArray(list) ? list : []).map((m: any) => {
+          if (!m) return ''
+          if (typeof m === 'object') return m.name || m.legal_name || `商户${m.id || ''}` || '未命名商户'
+          return String(m)
+        }).filter(Boolean)
+        if (names.length === 0) return '-'
+        return names.slice(0, 3).join(', ') + (names.length > 3 ? '...' : '')
+      } catch (e) {
+        return '-'
+      }
+    }
   },
   {
     colKey: 'created_at',
@@ -564,7 +525,7 @@ const loadTasks = async () => {
       page: pagination.current,
       pageSize: pagination.pageSize
     }
-    
+
     // 清理空值
     Object.keys(params).forEach(key => {
       if (params[key] === '' || params[key] === null) {
@@ -574,7 +535,7 @@ const loadTasks = async () => {
 
     const response = await fetchTasksPaged(params)
     console.log('API response:', response) // 调试日志
-    
+
     // 根据实际的API响应结构来解析数据
     if (response && typeof response === 'object') {
       if (Array.isArray(response.items)) {
@@ -586,10 +547,10 @@ const loadTasks = async () => {
             try {
               const pr = await fetchTaskProgress(t.id)
               const rate = pr?.data?.completion_rate ?? 0
-              ;(t as any).progress = Math.round((rate || 0) * 100)
+                ; (t as any).progress = Math.round((rate || 0) * 100)
             } catch (e) {
               // ignore per-task progress error
-              ;(t as any).progress = 0
+              ; (t as any).progress = 0
             }
           }))
         } catch (e) {
@@ -696,8 +657,8 @@ const editTask = (task: Task) => {
     plan_start_at: task.plan_start_at ? new Date(task.plan_start_at) : undefined,
     plan_end_at: task.plan_end_at ? new Date(task.plan_end_at) : undefined,
   })
-  // 确保 id 显式赋值（支持后端返回不同命名，比如 id / ID / task_id）
-  ;(form as any).id = (task as any).id ?? (task as any).ID ?? (task as any).task_id ?? (task as any).TaskID ?? undefined
+    // 确保 id 显式赋值（支持后端返回不同命名，比如 id / ID / task_id）
+    ; (form as any).id = (task as any).id ?? (task as any).ID ?? (task as any).task_id ?? (task as any).TaskID ?? undefined
   showCreateDialog.value = true
 }
 
@@ -714,12 +675,44 @@ const onSubmit = async () => {
 
   try {
     isSubmitting.value = true
-    
+
+    // 后备同步：确保从 MerchantSelect 组件读取到最新的选中商户（防止组件未触发 v-model 更新）
+    try {
+      const ms = merchantSelectRef?.value
+      if (ms) {
+        // 支持多种形态：internalValueLocal (ref 或数组)、modelValue、value
+        let vals: any = undefined
+        if (ms.internalValueLocal !== undefined) {
+          vals = ms.internalValueLocal
+        } else if (ms.modelValue !== undefined) {
+          vals = ms.modelValue
+        } else if (ms.value !== undefined) {
+          vals = ms.value
+        }
+        // 如果是 ref（带 .value），取其值
+        if (vals && typeof vals === 'object' && vals.hasOwnProperty('value')) {
+          vals = vals.value
+        }
+        if (Array.isArray(vals)) {
+          // 转为 number[] 并赋回表单
+          try {
+            form.selectedMerchants = vals.map((v: any) => Number(v)).filter((n: any) => !Number.isNaN(n))
+            console.log('Fallback synced selectedMerchants from MerchantSelect ref:', form.selectedMerchants)
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+    } catch (e) {
+      // 非致命，继续提交流程
+      console.warn('MerchantSelect fallback sync failed', e)
+    }
+
     // 构建scope_json
-    form.scope_json = buildScopeJson({ 
+    form.scope_json = buildScopeJson({
       users: form.assigneeId ? [form.assigneeId] : [],
-      merchants: form.selectedMerchants, 
-      tags: form.selectedTags 
+      merchants: form.selectedMerchants,
+      tags: form.selectedTags
     })
 
     const payload = {
@@ -740,22 +733,53 @@ const onSubmit = async () => {
         const resp = await updateTask(form.id, payload)
         console.log('Update response:', resp)
         notifySuccess('任务更新成功')
-        // 如果指派人发生变化，调用 assignTask
-        const originalAssignee = editingTask.value?.assignee_id ?? null
-        const newAssignee = form.assigneeId ?? null
-        if (originalAssignee !== newAssignee) {
-          try {
-            if (newAssignee === null) {
-              // 若后端支持取消指派，可调用 assignTask with null; 这里仅在选中非空时调用
-            } else {
-              console.log('Calling assignTask after update:', form.id, newAssignee)
-              await assignTask(form.id as number, newAssignee)
-              notifySuccess('指派人已更新')
+        // 如果商户列表有改动，使用 replace 模式更新任务商户（替换现有）
+        try {
+          const originalMerchants = (editingTask.value as any)?.merchants ? (editingTask.value as any).merchants.map((m: any) => m.id) : (editingTask.value as any)?.selectedMerchants || []
+          const newMerchants = form.selectedMerchants || []
+          // Compare as sets (order-independent). If different, always call replace (including when newMerchants is empty to clear list).
+          const arraysEqualAsSets = (a: number[], b: number[]) => {
+            if (!Array.isArray(a) || !Array.isArray(b)) return false
+            if (a.length !== b.length) return false
+            const s = new Set(a)
+            for (const v of b) {
+              if (!s.has(v)) return false
             }
-          } catch (e) {
-            console.error('Assign after update failed', e)
-            notifyError('更新后指派失败')
+            return true
           }
+          const same = arraysEqualAsSets(originalMerchants, newMerchants)
+          if (!same) {
+            try {
+              console.log('Replacing task merchants for task', form.id, newMerchants)
+              await generateTaskMerchants(form.id as number, newMerchants, form.assigneeId ?? undefined, undefined, { replace: true })
+              notifySuccess('任务商户已更新')
+            } catch (e) {
+              console.error('Replace task merchants failed', e)
+              notifyError('更新商户列表失败')
+            }
+          }
+        } catch (e) {
+          console.error('Update task merchants failed', e)
+          notifyError('更新商户列表失败')
+        }
+        // 始终尝试通过专用 assign 接口设置 assignee（即使后端在 update 时已设置）
+        // 这样可以保证前端会发出 PATCH /tasks/:id/assign 便于后端统一处理并方便调试
+        try {
+          const newAssignee = form.assigneeId ?? null
+          if (newAssignee !== null && (form as any).id) {
+            console.log('Calling assignTask after update (forced):', (form as any).id, newAssignee)
+            try {
+              const assignResp = await assignTask((form as any).id as number, newAssignee)
+              console.log('Assign response (after update):', assignResp)
+              notifySuccess('指派人已更新')
+            } catch (e: any) {
+              console.error('Assign after update failed', e, e?.response?.data)
+              if (e?.response) console.error('Assign HTTP status', e.response.status)
+              notifyError('更新后指派失败')
+            }
+          }
+        } catch (e) {
+          console.error('assign after update wrapper failed', e)
         }
       } catch (err: any) {
         console.error('Update failed:', err)
@@ -763,25 +787,41 @@ const onSubmit = async () => {
         return
       }
     } else {
-  const r = await createTask(payload)
-  console.log('Create response:', r)
-  // 后端返回形态不确定：尝试多个路径寻找新创建记录 ID
-  const createdId = r.data?.id ?? r.data?.data?.id ?? r.data?.task?.id ?? r.data?.task_id ?? r.data?.data?.task_id
-  // 如果创建时选择了 assignee，使用 assignTask 完成指派
-  if (createdId && form.assigneeId) {
-        try {
-          console.log('Calling assignTask after create:', createdId, form.assigneeId)
-          await assignTask(createdId, form.assigneeId)
-          notifySuccess('任务创建并分配成功')
-        } catch (e) {
-          console.error('Assign after create failed', e)
-          notifyError('创建后指派失败')
+      const r = await createTask(payload)
+      console.log('Create response:', r)
+      // 统一解析：后端应返回 { code:0, data: { task: { id, ... } } }
+      // 优先使用 data.task.id；兼容老形式时回退到 data.id
+      const createdId = r.data?.task?.id ?? r.data?.id ?? null
+      // 始终尝试通过 assign 接口设置 assignee（如果表单选择了被分配者）
+      if (createdId) {
+        if (form.assigneeId) {
+          try {
+            console.log('Calling assignTask after create (forced):', createdId, form.assigneeId)
+            const assignResp = await assignTask(createdId, form.assigneeId)
+            console.log('Assign response (after create):', assignResp)
+            notifySuccess('任务创建并分配成功')
+          } catch (e: any) {
+            console.error('Assign after create failed', e, e?.response?.data)
+            if (e?.response) console.error('Assign HTTP status', e.response.status)
+            notifyError('创建后指派失败')
+          }
         }
-      } else {
-        notifySuccess('任务创建成功: ID = ' + (createdId || ''))
+        // after assign, or if no assign chosen, continue to generate task merchants
+        try {
+          if (createdId && form.selectedMerchants && form.selectedMerchants.length > 0) {
+            console.log('Generating task merchants after create:', createdId, form.selectedMerchants)
+            await generateTaskMerchants(createdId, form.selectedMerchants, form.assigneeId ?? undefined)
+            notifySuccess('任务创建、指派并添加商户成功')
+          } else if (createdId) {
+            notifySuccess('任务创建成功: ID = ' + (createdId || ''))
+          }
+        } catch (e) {
+          console.error('GenerateTaskMerchants after create failed', e)
+          notifyError('创建后添加商户失败')
+        }
       }
     }
-    
+
     resetForm()
     loadTasks()
   } catch (err: any) {
@@ -812,14 +852,19 @@ const onAssignConfirm = async () => {
 
   try {
     isAssigning.value = true
-    await assignTask(assigningTask.value.id!, assignForm.assigneeId)
-    notifySuccess('任务分配成功')
-    showAssignDialog.value = false
-  // refresh
-  await loadTasks()
-  } catch (error) {
-    handleError(error)
-    notifyError('任务分配失败')
+    try {
+      const resp = await assignTask(assigningTask.value.id!, assignForm.assigneeId)
+      console.log('Assign response (manual):', resp)
+      notifySuccess('任务分配成功')
+      showAssignDialog.value = false
+    } catch (e: any) {
+      console.error('Assign manual failed', e, e?.response?.data)
+      if (e?.response) console.error('Assign HTTP status', e.response.status)
+      handleError(e)
+      notifyError('任务分配失败')
+    }
+    // refresh
+    await loadTasks()
   } finally {
     isAssigning.value = false
   }
@@ -855,22 +900,22 @@ const exportTasks = async () => {
     const params: any = { ...filters }
     // 不包含分页参数
     const { page, pageSize, ...exportParams } = params
-    
+
     const response = await exportTasksAPI(exportParams)
-    
-    // 创建下载链接
-    const blob = new Blob([response.data], { 
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+
+    // 创建下载链接（后端以 CSV 导出，前端使用 CSV 类型及扩展名）
+    const blob = new Blob([response.data], {
+      type: 'text/csv;charset=utf-8'
     })
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `tasks_${new Date().toISOString().split('T')[0]}.xlsx`
+    link.download = `tasks_${new Date().toISOString().split('T')[0]}.csv`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
-    
+
     notifySuccess('导出成功')
   } catch (error) {
     handleError(error)

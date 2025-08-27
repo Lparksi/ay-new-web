@@ -116,6 +116,10 @@ export const formValidationRules = {
 
   // 商家表单验证
   merchant: {
+    name: [
+      commonRules.required('请输入商家名称'),
+      commonRules.maxLength(200, '商家名称过长')
+    ],
     legal_name: [
       {
         required: true,

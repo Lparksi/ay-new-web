@@ -11,7 +11,7 @@ export function exportUsersToExcel(users: User[], filename = '用户列表') {
     '邮箱': user.email || '-',
     '手机号': user.phone || '-',
     '状态': user.active ? '激活' : '禁用',
-    '角色': user.roles ? user.roles.join(', ') : '-',
+  '角色': user.roles ? user.roles.map(r => r.name).join(', ') : '-',
     '创建时间': user.created_at ? new Date(user.created_at).toLocaleString('zh-CN') : '-',
     '更新时间': user.updated_at ? new Date(user.updated_at).toLocaleString('zh-CN') : '-'
   }))
@@ -51,7 +51,7 @@ export function exportUsersToCSV(users: User[], filename = '用户列表') {
     user.email || '-',
     user.phone || '-',
     user.active ? '激活' : '禁用',
-    user.roles ? user.roles.join(', ') : '-',
+  user.roles ? user.roles.map(r => r.name).join(', ') : '-',
     user.created_at ? new Date(user.created_at).toLocaleString('zh-CN') : '-',
     user.updated_at ? new Date(user.updated_at).toLocaleString('zh-CN') : '-'
   ])

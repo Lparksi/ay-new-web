@@ -11,6 +11,7 @@ const Map = () => import('../pages/Map.vue')
 const MerchantTags = () => import('../pages/MerchantTags.vue')
 const Profile = () => import('../pages/Profile.vue')
 const MyTasks = () => import('../pages/MyTasks.vue')
+const TaskManagementPage = () => import('../pages/TaskManagement.vue')
 
 const routes = [
   { 
@@ -44,6 +45,11 @@ const routes = [
   { 
     path: '/my-tasks',
     component: MyTasks,
+    meta: { requiresAuth: true }
+  },
+  { 
+    path: '/task-management',
+    component: TaskManagementPage,
     meta: { requiresAuth: true }
   },
   { 

@@ -41,18 +41,33 @@ export interface FetchTasksParams {
 }
 
 export async function fetchTasksPaged(params: FetchTasksParams = {}): Promise<any> {
-  const resp: AxiosResponse<any> = await http.get('/tasks', { params })
-  // 根据实际的API响应格式来解析
-  // 后端返回格式: {code: 0, msg: "success", data: {items: [], total: number}}
-  if (resp.data && resp.data.code === 0 && resp.data.data) {
-    return resp.data.data
+  // if params is empty, call the dedicated /tasks/my endpoint which reads user from JWT
+  const url = Object.keys(params).length === 0 ? '/tasks/my' : '/tasks'
+  const resp: AxiosResponse<any> = await http.get(url, { params })
+  // backend uses standard response wrapper: { code: 0, msg: 'success', data: { items: [], total: N } }
+  if (resp.data && resp.data.code === 0) {
+    return resp.data.data || resp.data
   }
-  // 如果格式不对，返回空数据
+  // fallback: if server already responded with {items, total}
+  if (resp.data && (resp.data.items || resp.data.total !== undefined)) {
+    return resp.data
+  }
   return { items: [], total: 0 }
 }
 
 export async function updateTask(id: number, payload: Partial<CreateTaskPayload>): Promise<AxiosResponse<any>> {
   const resp = await http.put(`/tasks/${id}`, payload)
+  return resp
+}
+
+export async function generateTaskMerchants(id: number, merchantIds: number[], assignedTo?: number | null, targetSubTaskCount?: number, options?: { replace?: boolean }): Promise<AxiosResponse<any>> {
+  const payload: any = {
+    merchant_ids: merchantIds,
+  }
+  if (assignedTo !== undefined) payload.assigned_to = assignedTo
+  if (targetSubTaskCount !== undefined) payload.target_subtask_count = targetSubTaskCount
+  if (options?.replace) payload.replace = true
+  const resp = await http.post(`/tasks/${id}/merchants`, payload)
   return resp
 }
 
@@ -82,6 +97,17 @@ export async function exportTasks(params: any = {}): Promise<AxiosResponse<Blob>
 export async function fetchTaskProgress(id: number): Promise<AxiosResponse<any>> {
   const resp = await http.get(`/tasks/${id}/progress`)
   return resp
+}
+
+export async function fetchTaskMerchants(id: number, params: any = {}): Promise<any> {
+  const resp: AxiosResponse<any> = await http.get(`/tasks/${id}/merchants`, { params })
+  if (resp.data && resp.data.code === 0) {
+    return resp.data.data || resp.data
+  }
+  if (resp.data && (resp.data.items || resp.data.total !== undefined)) {
+    return resp.data
+  }
+  return { items: [], total: 0 }
 }
 
 export async function transitionTask(id: number, action: string): Promise<AxiosResponse<any>> {

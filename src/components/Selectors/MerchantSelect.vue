@@ -73,7 +73,7 @@ export default defineComponent({
         const resp = await fetchMerchants({ q: qs, page: p, pageSize, tags: props.tags })
         const items = Array.isArray(resp) ? resp : (resp.items || [])
         const mapped = items.map((m: any) => ({
-          label: `${m.name}${m.address ? ' · ' + m.address : ''}${m.tags ? ' [' + (m.tags || []).map((t: any) => t.name || t).join(',') + ']' : ''}`,
+          label: `${m.name || m.legal_name || '未命名商户'}${m.address ? ' · ' + m.address : ''}${m.tags ? ' [' + (m.tags || []).map((t: any) => t.name || t).join(',') + ']' : ''}`,
           value: String(m.id),
         }))
         if (p > 1) {

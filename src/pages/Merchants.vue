@@ -17,7 +17,8 @@
               <template #icon><add-icon /></template>
               新建商家
             </t-button>
-            <input ref="importFileInput" type="file" accept=".xlsx,.xls" style="display:none" @change="onImportFileChange" />
+            <input ref="importFileInput" type="file" accept=".xlsx,.xls" style="display:none"
+              @change="onImportFileChange" />
             <t-button variant="outline" @click="triggerImportClick">
               <template #icon><download-icon /></template>
               批量导入
@@ -31,23 +32,14 @@
     <t-card class="quick-actions-card">
       <div class="quick-actions">
         <t-space size="medium">
-          <t-input 
-            v-model="globalSearchKeyword"
-            placeholder="全局搜索商家名称、电话、地址..."
-            clearable
-            style="width: 320px;"
-            @change="handleGlobalSearch"
-          >
+          <t-input v-model="globalSearchKeyword" placeholder="全局搜索商家名称、电话、地址..." clearable style="width: 320px;"
+            @change="handleGlobalSearch">
             <template #prefix-icon>
               <search-icon />
             </template>
           </t-input>
-          
-          <t-button 
-            variant="outline" 
-            @click="resetAllFilters"
-            v-if="hasAnyActiveFilter"
-          >
+
+          <t-button variant="outline" @click="resetAllFilters" v-if="hasAnyActiveFilter">
             <template #icon><refresh-icon /></template>
             重置所有筛选
           </t-button>
@@ -71,16 +63,9 @@
             <div class="stat-number">{{ averageAccuracy.toFixed(1) }}%</div>
             <div class="stat-label">
               平均定位精度
-              <t-tooltip 
-                content="定位精度表示地理编码结果的可信度，100%为最准确。该数值反映了商家地址坐标的精确程度，精度越高位置越准确。"
-                placement="top"
-                show-arrow
-                theme="default"
-              >
-                <info-circle-icon 
-                  style="margin-left: 4px; color: #999; cursor: help;" 
-                  size="14px"
-                />
+              <t-tooltip content="定位精度表示地理编码结果的可信度，100%为最准确。该数值反映了商家地址坐标的精确程度，精度越高位置越准确。" placement="top" show-arrow
+                theme="default">
+                <info-circle-icon style="margin-left: 4px; color: #999; cursor: help;" size="14px" />
               </t-tooltip>
             </div>
           </div>
@@ -99,24 +84,15 @@
               <t-tag theme="primary" variant="light" size="small">
                 已选中 {{ selectedRowKeys.length }} 个商家
               </t-tag>
-              <t-button 
-                theme="default" 
-                variant="text" 
-                size="small" 
-                @click="clearSelection"
-              >
+              <t-button theme="default" variant="text" size="small" @click="clearSelection">
                 取消选择
               </t-button>
             </div>
           </div>
           <t-space size="small">
             <!-- 批量操作按钮 -->
-            <t-dropdown 
-              v-if="hasSelectedMerchants" 
-              trigger="click" 
-              placement="bottom-right"
-              :popup-props="{ attach: 'body' }"
-            >
+            <t-dropdown v-if="hasSelectedMerchants" trigger="click" placement="bottom-right"
+              :popup-props="{ attach: 'body' }">
               <t-button theme="primary" variant="outline">
                 批量操作 ({{ selectedRowKeys.length }})
                 <template #suffix><chevron-down-icon /></template>
@@ -134,7 +110,7 @@
                 </t-dropdown-menu>
               </template>
             </t-dropdown>
-            
+
             <t-tooltip content="刷新数据">
               <t-button variant="outline" @click="loadMerchants">
                 <template #icon><refresh-icon /></template>
@@ -144,32 +120,19 @@
         </div>
       </template>
 
-      <t-table
-        :data="merchants"
-        :columns="columns"
-        row-key="id"
-        :loading="loading"
-        :pagination="pagination"
-        :hover="true"
-        :stripe="true"
-        :bordered="true"
-        :max-height="600"
-        resizable
-        :selected-row-keys="selectedRowKeys"
-        :filter-value="filterValue"
-        @page-change="handlePageChange"
-        @filter-change="handleFilterChange"
-        @change="handleTableChange"
-        @row-click="handleRowClick"
-        @select-change="handleSelectChange"
-      >
+      <t-table :data="merchants" :columns="columns" row-key="id" :loading="loading" :pagination="pagination"
+        :hover="true" :stripe="true" :bordered="true" :max-height="600" resizable :selected-row-keys="selectedRowKeys"
+        :filter-value="filterValue" @page-change="handlePageChange" @filter-change="handleFilterChange"
+        @change="handleTableChange" @row-click="handleRowClick" @select-change="handleSelectChange">
         <template #actions="{ row }">
           <t-space size="4px" direction="vertical" style="width: 100%;">
-            <t-button theme="primary" variant="outline" size="small" style="width: 100%;" @click.stop="editMerchant(row)">
+            <t-button theme="primary" variant="outline" size="small" style="width: 100%;"
+              @click.stop="editMerchant(row)">
               <template #icon><edit-icon /></template>
               编辑
             </t-button>
-            <t-button theme="danger" variant="outline" size="small" style="width: 100%;" @click.stop="deleteMerchant(row)">
+            <t-button theme="danger" variant="outline" size="small" style="width: 100%;"
+              @click.stop="deleteMerchant(row)">
               <template #icon><delete-icon /></template>
               删除
             </t-button>
@@ -216,43 +179,21 @@
     </t-card>
 
     <!-- Create/Edit Modal -->
-    <t-dialog
-      v-model:visible="showModal"
-      :title="isEditing ? '编辑商户' : '创建商户'"
-      width="600px"
-      placement="center"
-      :confirm-loading="submitting"
-      @confirm="handleSubmit"
-      @cancel="handleCancel"
-      :confirm-on-enter="true"
-    >
-      <t-form
-        ref="formRef"
-        :data="formData"
-        :rules="formRules"
-        label-width="100px"
-        :colon="true"
-        :required-mark="false"
-      >
+    <t-dialog v-model:visible="showModal" :title="isEditing ? '编辑商户' : '创建商户'" width="600px" placement="center"
+      :confirm-loading="submitting" @confirm="handleSubmit" @cancel="handleCancel" :confirm-on-enter="true">
+      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="100px" :colon="true"
+        :required-mark="false">
         <!-- 基本信息 -->
         <t-divider>基本信息</t-divider>
         <t-row :gutter="16">
           <t-col :span="12">
             <t-form-item label="法人姓名" name="legal_name" :required-mark="true">
-              <t-input 
-                v-model="formData.legal_name" 
-                placeholder="请输入法人姓名"
-                clearable
-              />
+              <t-input v-model="formData.legal_name" placeholder="请输入法人姓名" clearable />
             </t-form-item>
           </t-col>
           <t-col :span="12">
             <t-form-item label="联系电话" name="phone">
-              <t-input 
-                v-model="formData.phone" 
-                placeholder="请输入联系电话"
-                clearable
-              />
+              <t-input v-model="formData.phone" placeholder="请输入联系电话" clearable />
             </t-form-item>
           </t-col>
         </t-row>
@@ -260,20 +201,12 @@
         <t-row :gutter="16">
           <t-col :span="12">
             <t-form-item label="城市" name="city">
-              <t-input 
-                v-model="formData.city" 
-                placeholder="请输入城市"
-                clearable
-              />
+              <t-input v-model="formData.city" placeholder="请输入城市" clearable />
             </t-form-item>
           </t-col>
           <t-col :span="12">
             <t-form-item label="商圈" name="area">
-              <t-select 
-                v-model="formData.area" 
-                placeholder="请选择商圈类型"
-                clearable
-              >
+              <t-select v-model="formData.area" placeholder="请选择商圈类型" clearable>
                 <t-option value="居民区" label="居民区" />
                 <t-option value="商业（集贸）区" label="商业（集贸）区" />
                 <t-option value="其他" label="其他" />
@@ -285,22 +218,12 @@
         <!-- 地址信息 -->
         <t-divider>地址信息</t-divider>
         <t-form-item label="详细地址" name="address" :required-mark="true">
-          <t-textarea 
-            v-model="formData.address" 
-            placeholder="请输入详细地址"
-            :maxlength="200"
-            :autosize="{ minRows: 2, maxRows: 4 }"
-          />
+          <t-textarea v-model="formData.address" placeholder="请输入详细地址" :maxlength="200"
+            :autosize="{ minRows: 2, maxRows: 4 }" />
           <template #help>
             <t-space size="8px" style="margin-top: 8px;">
-              <t-button 
-                theme="primary" 
-                variant="outline"
-                size="small"
-                :loading="geocoding"
-                :disabled="!formData.address?.trim()"
-                @click="convertAddressToCoordinates"
-              >
+              <t-button theme="primary" variant="outline" size="small" :loading="geocoding"
+                :disabled="!formData.address?.trim()" @click="convertAddressToCoordinates">
                 <template #icon v-if="!geocoding">
                   <location-icon />
                 </template>
@@ -319,11 +242,7 @@
         </t-form-item>
 
         <!-- 坐标信息 -->
-        <t-form-item 
-          v-if="formData.lng && formData.lat"
-          label="坐标信息" 
-          name="coordinates"
-        >
+        <t-form-item v-if="formData.lng && formData.lat" label="坐标信息" name="coordinates">
           <t-card variant="outline" size="small">
             <t-space direction="vertical" size="4px">
               <t-space size="12px">
@@ -351,18 +270,79 @@
         </t-form-item>
       </t-form>
     </t-dialog>
+
+    <!-- Merchant Detail Dialog: 显示商家详情、子任务与资产 -->
+    <t-dialog v-model:visible="showDetailDialog" title="商家详情" width="800px" placement="center">
+      <div v-if="detailMerchant">
+        <t-row :gutter="16">
+          <t-col :span="12">
+            <t-card size="small" variant="outline">
+              <div style="font-weight:600">基本信息</div>
+              <div style="margin-top:8px">法人：{{ detailMerchant.legal_name }}</div>
+              <div>电话：{{ detailMerchant.phone || '无' }}</div>
+              <div>地址：{{ detailMerchant.address || '无' }}</div>
+              <div>城市/商圈：{{ detailMerchant.city || '-' }} / {{ detailMerchant.area || '-' }}</div>
+              <div v-if="detailMerchant.lng && detailMerchant.lat">坐标：{{ detailMerchant.lng }}, {{ detailMerchant.lat }}
+              </div>
+            </t-card>
+          </t-col>
+          <t-col :span="12">
+            <t-card size="small" variant="outline">
+              <div style="font-weight:600">统计</div>
+              <div style="margin-top:8px">定位精度：{{ detailMerchant.geocode_description || '未知' }}</div>
+              <div>精度分数：{{ detailMerchant.geocode_score ?? '-' }}</div>
+            </t-card>
+          </t-col>
+        </t-row>
+
+        <t-divider style="margin-top:12px">相关子任务</t-divider>
+        <t-card size="small" variant="outline">
+          <div v-if="loadingSubtasks">加载中...</div>
+          <div v-else-if="merchantSubtasks.length === 0" style="color:#6b7280">暂无子任务</div>
+          <t-list v-else>
+            <t-list-item v-for="st in merchantSubtasks" :key="st.id">
+              <div style="display:flex; justify-content:space-between; align-items:center; width:100%">
+                <div>
+                  <div style="font-weight:600">{{ st.content || st.title || ('子任务 #' + st.id) }}</div>
+                  <div style="font-size:12px; color:#6b7280">提交人: {{ st.submitter_name || st.submitter_id || '-' }} · {{
+                    st.submitted_at || st.created_at || '' }}</div>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center">
+                  <t-button size="small" variant="outline" @click="fetchAttachmentsForSubtask(st.id)">
+                    查看资产
+                  </t-button>
+                </div>
+              </div>
+
+              <!-- 附件预览区 -->
+              <div v-if="attachmentsCache[st.id] && attachmentsCache[st.id].length > 0" style="margin-top:8px">
+                <t-space>
+                  <a v-for="att in attachmentsCache[st.id]" :key="att.id || att.url" :href="att.url" target="_blank"
+                    rel="noreferrer">
+                    {{ att.file_name || att.url }}
+                  </a>
+                </t-space>
+              </div>
+            </t-list-item>
+          </t-list>
+        </t-card>
+      </div>
+      <template #footer>
+        <t-button variant="outline" @click="showDetailDialog = false">关闭</t-button>
+      </template>
+    </t-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, reactive, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { 
-  Table, Button, Dialog, Form, FormItem, Input, MessagePlugin, Tag as TTag, Space, 
+import {
+  Table, Button, Dialog, Form, FormItem, Input, MessagePlugin, Tag as TTag, Space,
   Divider, Card, Alert, Select, Option, DateRangePicker, RangeInput, Cascader as TCascader,
   Row, Col, Textarea, Tooltip, Dropdown, DropdownMenu, DropdownItem, DialogPlugin
 } from 'tdesign-vue-next'
-import { 
+import {
   AddIcon, LocationIcon, SearchIcon, RefreshIcon, ChevronDownIcon, ChevronUpIcon,
   DownloadIcon, EditIcon, DeleteIcon, MoreIcon, BrowseIcon, InfoCircleIcon, CopyIcon
 } from 'tdesign-icons-vue-next'
@@ -371,6 +351,7 @@ import TagSelect from '../components/Selectors/TagSelect.vue'
 import { formatTagLabel } from '../utils/tags'
 import { fetchMerchants, createMerchant, updateMerchant, deleteMerchant as deleteMerchantApi, batchDeleteMerchants } from '../api/merchant'
 import { batchImportMerchants } from '../api/merchant'
+import { listSubTasks, listSubtaskAttachments } from '../api/subtask'
 import { fetchTags, createTag } from '../api/tag'
 import { geocode } from '../api/geocode'
 import type { Merchant, Tag } from '../types'
@@ -386,6 +367,14 @@ const isEditing = ref(false)
 const formRef = ref()
 const selectedRowKeys = ref<(string | number)[]>([])
 const importFileInput = ref<HTMLInputElement | null>(null)
+
+// 详情相关：用于显示商家详情并查看相关子任务与资产
+const showDetailDialog = ref(false)
+const detailMerchant = ref<Merchant | null>(null)
+const merchantSubtasks = ref<any[]>([])
+const loadingSubtasks = ref(false)
+const attachmentsCache: Record<number, any[]> = reactive({})
+const loadingAttachments: Record<number, boolean> = reactive({})
 
 // 映射表头到请求字段
 const headerMap: Record<string, string> = {
@@ -457,9 +446,9 @@ const cityOptions = ref([
 
 const areaOptions = computed(() => {
   if (!searchParams.city) return []
-  
+
   // 根据城市返回对应的区域选项
-  const areaMap: Record<string, Array<{label: string, value: string}>> = {
+  const areaMap: Record<string, Array<{ label: string, value: string }>> = {
     '安阳市': [
       { label: '文峰区', value: '文峰区' },
       { label: '北关区', value: '北关区' },
@@ -477,7 +466,7 @@ const areaOptions = computed(() => {
       { label: '惠济区', value: '惠济区' },
     ]
   }
-  
+
   return areaMap[searchParams.city] || []
 })
 
@@ -487,7 +476,7 @@ const tagOptions = ref<Tag[]>([])
 const tagCascaderOptions = computed(() => {
   const groups: Record<string, Tag[]> = {}
   const allTags = tagOptions.value || []
-  
+
   // 按类别分组标签
   allTags.forEach((t: Tag) => {
     const cls = (t.class && String(t.class).trim()) || '其他'
@@ -527,7 +516,7 @@ const hasSelectedMerchants = computed(() => {
 
 // 计算属性：选中的商家数据
 const selectedMerchants = computed(() => {
-  return merchants.value.filter(merchant => 
+  return merchants.value.filter(merchant =>
     selectedRowKeys.value.includes(merchant.id)
   )
 })
@@ -550,10 +539,10 @@ const hasActiveFilters = computed(() => {
 const hasAnyActiveFilter = computed(() => {
   const hasTableFilter = Object.keys(filterValue.value).some(key => {
     const value = filterValue.value[key]
-    return value !== undefined && value !== null && value !== '' && 
-           (Array.isArray(value) ? value.length > 0 : true)
+    return value !== undefined && value !== null && value !== '' &&
+      (Array.isArray(value) ? value.length > 0 : true)
   })
-  
+
   return hasActiveFilters.value || hasTableFilter || globalSearchKeyword.value.trim() !== ''
 })
 
@@ -570,16 +559,16 @@ const formRules = {
     { max: 200, message: '地址最多200个字符', trigger: 'change' }
   ],
   phone: [
-    { 
+    {
       validator: (val: string) => {
         // 如果为空，则通过验证（非必填）
         if (!val || val.trim() === '') return true
         // 如果有值，则验证手机号格式
         const phoneRegex = /^1[3-9]\d{9}$/
         return phoneRegex.test(val)
-      }, 
-      message: '请输入有效的手机号码', 
-      trigger: 'blur' 
+      },
+      message: '请输入有效的手机号码',
+      trigger: 'blur'
     }
   ],
   city: [
@@ -589,14 +578,14 @@ const formRules = {
     { max: 50, message: '商圈名称最多50个字符', trigger: 'change' }
   ],
   tags: [
-    { 
+    {
       validator: (val: number[]) => {
         // 标签是可选的，但如果选择了标签，限制最多10个
         if (!val || !Array.isArray(val)) return true
         return val.length <= 10
-      }, 
-      message: '最多只能选择10个标签', 
-      trigger: 'change' 
+      },
+      message: '最多只能选择10个标签',
+      trigger: 'change'
     }
   ]
 }
@@ -606,8 +595,8 @@ const columns = computed(() => [
     colKey: 'row-select',
     type: 'multiple',
   },
-  { 
-    colKey: 'id', 
+  {
+    colKey: 'id',
     title: 'ID',
     width: 80,
     filter: {
@@ -617,8 +606,8 @@ const columns = computed(() => [
       confirmEvents: ['onEnter']
     }
   },
-  { 
-    colKey: 'legal_name', 
+  {
+    colKey: 'legal_name',
     title: '法人姓名',
     width: 120,
     filter: {
@@ -628,8 +617,8 @@ const columns = computed(() => [
       confirmEvents: ['onEnter']
     }
   },
-  { 
-    colKey: 'phone', 
+  {
+    colKey: 'phone',
     title: '联系电话',
     width: 130,
     filter: {
@@ -639,8 +628,8 @@ const columns = computed(() => [
       confirmEvents: ['onEnter']
     }
   },
-  { 
-    colKey: 'address', 
+  {
+    colKey: 'address',
     title: '详细地址',
     ellipsis: true,
     filter: {
@@ -650,8 +639,8 @@ const columns = computed(() => [
       confirmEvents: ['onEnter']
     }
   },
-  { 
-    colKey: 'area', 
+  {
+    colKey: 'area',
     title: '商圈',
     width: 120,
     filter: {
@@ -679,17 +668,17 @@ const columns = computed(() => [
       if (!row.tags || !Array.isArray(row.tags) || row.tags.length === 0) {
         return h('span', { class: 'text-placeholder' }, '无标签')
       }
-      
+
       const tagElements = row.tags.map((tagId: number) => {
         const tag = tagOptions.value.find((t: Tag) => t.id === Number(tagId))
         if (!tag) {
           // 如果找不到标签，显示ID
-          return h('span', { 
+          return h('span', {
             class: 'text-placeholder',
             style: 'font-size: 12px; color: #999;'
           }, `[未知标签:${tagId}]`)
         }
-        
+
         const label = formatTagLabel(tag)
         return h(TTag, {
           theme: 'primary',
@@ -699,15 +688,15 @@ const columns = computed(() => [
           style: 'margin-right: 4px; margin-bottom: 2px;'
         }, () => label)
       }).filter(Boolean)
-      
-      return h('div', { 
+
+      return h('div', {
         class: 'tags-cell',
         style: 'max-width: 140px; line-height: 1.4;'
       }, tagElements)
     }
   },
-  { 
-    colKey: 'coordinates', 
+  {
+    colKey: 'coordinates',
     title: '坐标信息',
     width: 150,
     filter: {
@@ -725,8 +714,8 @@ const columns = computed(() => [
           h('div', { class: 'coordinate-item' }, `经: ${row.lng.toFixed(4)}`),
           h('div', { class: 'coordinate-item' }, `纬: ${row.lat.toFixed(4)}`)
         ]
-        
-  return h('div', { class: 'coordinates-cell' }, elements)
+
+        return h('div', { class: 'coordinates-cell' }, elements)
       }
       return h('span', { class: 'text-placeholder' }, '未设置')
     }
@@ -738,13 +727,13 @@ const columns = computed(() => [
     filter: {
       type: 'single' as const,
       list: [
-  { label: '非常精确', value: '非常精确' },
-  { label: '精确定位', value: '精确定位' },
-  { label: '中等定位', value: '中等定位' },
-  { label: '粗略定位', value: '粗略定位' },
-  { label: '未知精度', value: '未知精度' },
-  { label: '等待解析', value: '等待解析' },
-  { label: '解析失败', value: '解析失败' },
+        { label: '非常精确', value: '非常精确' },
+        { label: '精确定位', value: '精确定位' },
+        { label: '中等定位', value: '中等定位' },
+        { label: '粗略定位', value: '粗略定位' },
+        { label: '未知精度', value: '未知精度' },
+        { label: '等待解析', value: '等待解析' },
+        { label: '解析失败', value: '解析失败' },
       ],
       resetValue: '',
       showConfirmAndReset: true
@@ -753,7 +742,7 @@ const columns = computed(() => [
       if (!row.geocode_description) {
         return h('span', { class: 'text-placeholder' }, '未知')
       }
-      
+
       return h(TTag, {
         theme: getAccuracyTheme(row.geocode_score),
         variant: 'light',
@@ -771,7 +760,7 @@ async function loadMerchants() {
       page: pagination.current,
       pageSize: pagination.pageSize,
     })
-    
+
     let items: Merchant[] = []
     if (Array.isArray(response)) items = response
     else items = response.items || []
@@ -784,8 +773,8 @@ async function loadMerchants() {
     // 调试：打印前几条商家及其 tags 字段，和当前前端加载的 tagOptions
     try {
       console.log('[loadMerchants] loaded merchants count:', merchants.value.length)
-      console.log('[loadMerchants] first 5 merchants tags:', merchants.value.slice(0,5).map(m=>({ id: m.id, tags: m.tags })))
-      console.log('[loadMerchants] current tagOptions count:', (tagOptions.value || []).length, tagOptions.value.slice(0,10))
+      console.log('[loadMerchants] first 5 merchants tags:', merchants.value.slice(0, 5).map(m => ({ id: m.id, tags: m.tags })))
+      console.log('[loadMerchants] current tagOptions count:', (tagOptions.value || []).length, tagOptions.value.slice(0, 10))
     } catch (e) {
       // ignore logging errors
     }
@@ -845,7 +834,7 @@ async function loadTags() {
     } else {
       tagOptions.value = response.items || []
     }
-    
+
     console.log('标签加载成功:', tagOptions.value.length, '个标签')
     console.log('标签类别分布:', tagCascaderOptions.value.map(opt => ({
       category: opt.label,
@@ -861,7 +850,7 @@ async function loadTags() {
 watch(tagOptions, (newTags, oldTags) => {
   if (newTags.length !== oldTags.length) {
     console.log('标签数据已更新，级联筛选器选项:', tagCascaderOptions.value.length, '个类别')
-    
+
     // 更新表格标签列的filter list
     const tagsColumn = columns.value.find(col => col.colKey === 'tags')
     if (tagsColumn && tagsColumn.filter && 'list' in tagsColumn.filter) {
@@ -886,10 +875,10 @@ async function onImportFileChange(e: Event) {
   if (!input || !input.files || input.files.length === 0) return
   const file = input.files[0]
   try {
-  // 确保已加载标签数据，以便将标签名称映射为 id
-  await loadTags()
-  console.log('[onImportFileChange] loaded tagOptions count:', (tagOptions.value || []).length, tagOptions.value)
-  const items = await parseXlsxFile(file)
+    // 确保已加载标签数据，以便将标签名称映射为 id
+    await loadTags()
+    console.log('[onImportFileChange] loaded tagOptions count:', (tagOptions.value || []).length, tagOptions.value)
+    const items = await parseXlsxFile(file)
     try { console.log('[onImportFileChange] parsed items preview (json):', JSON.stringify(items && items.length ? items.slice(0, 5) : items, null, 2)) } catch (e) { console.log('[onImportFileChange] parsed items preview:', items && items.length ? items.slice(0, 5) : items) }
     if (!items || items.length === 0) {
       MessagePlugin.error('未解析到有效的数据')
@@ -960,8 +949,8 @@ function parseXlsxFile(file: File): Promise<any[]> {
         const workbook = XLSX.read(data, { type: 'array' })
         const firstSheetName = workbook.SheetNames[0]
         const worksheet = workbook.Sheets[firstSheetName]
-  const json = XLSX.utils.sheet_to_json(worksheet, { header: 0 }) as any[]
-  try { console.log('[parseXlsxFile] raw excel headers:', JSON.stringify(Object.keys(json[0] || {}), null, 2)) } catch (e) { console.log('[parseXlsxFile] raw excel headers:', Object.keys(json[0] || {})) }
+        const json = XLSX.utils.sheet_to_json(worksheet, { header: 0 }) as any[]
+        try { console.log('[parseXlsxFile] raw excel headers:', JSON.stringify(Object.keys(json[0] || {}), null, 2)) } catch (e) { console.log('[parseXlsxFile] raw excel headers:', Object.keys(json[0] || {})) }
         const mapped = json.map(row => {
           const out: any = {}
           for (const key in row) {
@@ -1142,7 +1131,7 @@ async function handleSubmit() {
       area: formData.area,
       tags: formData.tags || [], // 包含标签数据
     }
-    
+
     // 只有当经纬度有值时才添加到payload中
     if (formData.lng !== null) payload.lng = formData.lng
     if (formData.lat !== null) payload.lat = formData.lat
@@ -1192,8 +1181,8 @@ async function triggerReparse() {
     confirmBtn: '确定',
     cancelBtn: '取消',
     onConfirm: async ({ e }) => {
-  dialog.destroy()
-  await doReparse(formData.id as number)
+      dialog.destroy()
+      await doReparse(formData.id as number)
     },
     onCancel: ({ e }) => {
       dialog.destroy()
@@ -1209,8 +1198,8 @@ async function reparseMerchant(row: Merchant) {
     confirmBtn: '确定',
     cancelBtn: '取消',
     onConfirm: async ({ e }) => {
-  dialog.destroy()
-  await doReparse(row.id)
+      dialog.destroy()
+      await doReparse(row.id)
     },
     onCancel: ({ e }) => {
       dialog.destroy()
@@ -1305,20 +1294,20 @@ async function convertAddressToCoordinates() {
     MessagePlugin.warning('请先输入地址')
     return
   }
-  
+
   try {
     geocoding.value = true
     const result = await geocode({
       address: formData.address,
       city: formData.city || '安阳市'
     })
-    
+
     formData.lng = result.lng
     formData.lat = result.lat
     formData.geocode_level = result.level || ''
     formData.geocode_score = result.level_score || null
     formData.geocode_description = result.level_description || ''
-    
+
     MessagePlugin.success(`地址转换成功！精度：${result.level_description || '未知'}`)
   } catch (error: any) {
     handleError(error)
@@ -1340,33 +1329,33 @@ function getAccuracyTheme(score?: number | null): 'default' | 'primary' | 'succe
 // 处理筛选变化
 function handleFilterChange(filters: any, context: any) {
   console.log('Filter changed:', filters, context)
-  
+
   // 特别处理标签筛选器的值
   if (filters.tags && Array.isArray(filters.tags)) {
     console.log('Tags filter values:', filters.tags)
-    
+
     // 验证标签ID的有效性
     const validTagIds = filters.tags.filter((id: any) => {
       const numId = Number(id)
       return !isNaN(numId) && tagOptions.value.some((tag: Tag) => tag.id === numId)
     })
-    
+
     if (validTagIds.length !== filters.tags.length) {
       console.warn('Some tag IDs are invalid:', filters.tags.filter((id: any) => !validTagIds.includes(id)))
     }
-    
+
     filters.tags = validTagIds
   }
-  
+
   // 更新全局筛选值状态
   filterValue.value = { ...filters }
-  
+
   // 重置到第一页
   pagination.current = 1
-  
+
   // 清空选中状态
   selectedRowKeys.value = []
-  
+
   // 重新加载数据
   loadMerchants()
 }
@@ -1383,10 +1372,10 @@ function handleGlobalSearch() {
 function resetAllFilters() {
   // 重置表格筛选
   filterValue.value = {}
-  
+
   // 重置全局搜索
   globalSearchKeyword.value = ''
-  
+
   // 重置其他搜索参数
   Object.assign(searchParams, {
     keyword: '',
@@ -1398,7 +1387,7 @@ function resetAllFilters() {
     geocodeLevel: '',
     scoreRange: null,
   })
-  
+
   selectedRowKeys.value = [] // 重置筛选时清空选中状态
   pagination.current = 1 // 重置到第一页
   loadMerchants()
@@ -1482,12 +1471,12 @@ function handleBatchExport() {
     MessagePlugin.warning('请先选择要导出的商家')
     return
   }
-  
+
   try {
     // 导出选中的商家数据
     exportMerchantsToExcel(selectedMerchants.value, '选中商家列表')
     MessagePlugin.success(`成功导出 ${selectedMerchants.value.length} 条选中商家数据`)
-    
+
     // 清空选择状态
     clearSelection()
   } catch (error) {
@@ -1502,7 +1491,7 @@ async function handleBatchDelete() {
     MessagePlugin.warning('请先选择要删除的商家')
     return
   }
-  
+
   // 显示确认对话框
   const dialog = DialogPlugin.confirm({
     header: '确认批量删除',
@@ -1514,7 +1503,7 @@ async function handleBatchDelete() {
       try {
         // 调用批量删除API
         await batchDeleteMerchants(selectedRowKeys.value.map(Number))
-        
+
         MessagePlugin.success(`批量删除 ${selectedMerchants.value.length} 个商家成功`)
         selectedRowKeys.value = [] // 清空选中状态
         await loadMerchants() // 重新加载数据
@@ -1537,7 +1526,39 @@ function handleRowClick(context: any) {
 
 // 查看商家详情
 function viewMerchantDetail(merchant: Merchant) {
-  MessagePlugin.info(`查看商家详情：${merchant.legal_name}`)
+  detailMerchant.value = merchant
+  showDetailDialog.value = true
+  // 异步加载该商家的子任务
+  fetchMerchantSubtasks(merchant.id)
+}
+
+async function fetchMerchantSubtasks(merchantId: number) {
+  try {
+    loadingSubtasks.value = true
+    const resp = await listSubTasks({ merchantId, page: 1, size: 50 })
+    // 兼容不同后端返回结构
+    const items = resp?.data?.items || resp?.data?.list || resp?.data || resp
+    merchantSubtasks.value = Array.isArray(items) ? items : (items?.items || [])
+  } catch (err: any) {
+    handleError(err)
+    merchantSubtasks.value = []
+  } finally {
+    loadingSubtasks.value = false
+  }
+}
+
+async function fetchAttachmentsForSubtask(subtaskId: number) {
+  try {
+    loadingAttachments[subtaskId] = true
+    const resp = await listSubtaskAttachments(subtaskId, 1, 50)
+    const items = resp?.data?.items || resp?.data?.list || resp?.data || resp
+    attachmentsCache[subtaskId] = Array.isArray(items) ? items : (items?.items || [])
+  } catch (err: any) {
+    console.error('load attachments failed', err)
+    attachmentsCache[subtaskId] = []
+  } finally {
+    loadingAttachments[subtaskId] = false
+  }
 }
 
 // 复制商家信息
@@ -1549,7 +1570,7 @@ function copyMerchantInfo(merchant: Merchant) {
 城市：${merchant.city}
 商圈：${merchant.area}
 ${merchant.lng && merchant.lat ? `坐标：${merchant.lng}, ${merchant.lat}` : '无坐标信息'}`
-  
+
   navigator.clipboard.writeText(info).then(() => {
     MessagePlugin.success('商家信息已复制到剪贴板')
   }).catch(() => {
@@ -1574,7 +1595,7 @@ onMounted(async () => {
     // 首先加载标签数据，为级联筛选器提供选项
     await loadTags()
     console.log('标签数据加载完成:', tagOptions.value.length)
-    
+
     // 然后加载商家数据
     await loadMerchants()
     console.log('商家数据加载完成:', merchants.value.length)
@@ -1825,7 +1846,8 @@ onMounted(async () => {
 
 :deep(.t-table) {
   border-radius: 6px;
-  table-layout: auto; /* 启用自动列宽 */
+  table-layout: auto;
+  /* 启用自动列宽 */
   width: 100%;
 }
 
@@ -1837,7 +1859,8 @@ onMounted(async () => {
   font-weight: 600;
   color: #374151;
   border-bottom: 1px solid #e5e7eb;
-  white-space: nowrap; /* 防止表头文字换行 */
+  white-space: nowrap;
+  /* 防止表头文字换行 */
 }
 
 :deep(.t-table__body tr:hover) {
@@ -1850,46 +1873,55 @@ onMounted(async () => {
 
 /* 特定列的样式优化 */
 :deep(.t-table__body td:first-child) {
-  width: 1%; /* 选择列最小宽度 */
+  width: 1%;
+  /* 选择列最小宽度 */
 }
 
 :deep(.t-table__body td:nth-child(2)) {
-  width: 1%; /* ID列最小宽度 */
+  width: 1%;
+  /* ID列最小宽度 */
   white-space: nowrap;
 }
 
 :deep(.t-table__body td:nth-child(3)) {
-  width: 10%; /* 法人姓名列 */
+  width: 10%;
+  /* 法人姓名列 */
   white-space: nowrap;
 }
 
 :deep(.t-table__body td:nth-child(4)) {
-  width: 12%; /* 联系电话列 */
+  width: 12%;
+  /* 联系电话列 */
   white-space: nowrap;
 }
 
 :deep(.t-table__body td:nth-child(5)) {
-  width: 25%; /* 详细地址列 - 重新增加一些空间 */
+  width: 25%;
+  /* 详细地址列 - 重新增加一些空间 */
   word-break: break-word;
   max-width: 200px;
 }
 
 :deep(.t-table__body td:nth-child(6)) {
-  width: 8%; /* 城市列 */
+  width: 8%;
+  /* 城市列 */
   white-space: nowrap;
 }
 
 :deep(.t-table__body td:nth-child(7)) {
-  width: 10%; /* 商圈列 - 恢复一些空间 */
+  width: 10%;
+  /* 商圈列 - 恢复一些空间 */
   white-space: nowrap;
 }
 
 :deep(.t-table__body td:nth-child(8)) {
-  width: 15%; /* 经纬度列 - 恢复一些空间 */
+  width: 15%;
+  /* 经纬度列 - 恢复一些空间 */
 }
 
 :deep(.t-table__body td:last-child) {
-  width: 20%; /* 操作列减少宽度，因为竖向排列更紧凑 */
+  width: 20%;
+  /* 操作列减少宽度，因为竖向排列更紧凑 */
   white-space: nowrap;
 }
 
@@ -2037,47 +2069,49 @@ onMounted(async () => {
   .merchants-page {
     padding: 0 8px;
   }
-  
+
   .page-header {
     flex-direction: column;
     gap: 16px;
     align-items: stretch;
   }
-  
+
   .header-actions {
     margin-left: 0;
   }
-  
+
   .basic-filters :deep(.t-space) {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .basic-filters :deep(.t-space > *) {
     width: 100% !important;
   }
-  
+
   .stats-row :deep(.t-col) {
     margin-bottom: 16px;
   }
-  
+
   /* 中等屏幕下的操作列优化 */
   :deep(.t-table .t-space) {
     gap: 3px !important;
   }
-  
+
   :deep(.t-table .t-button--size-small) {
     padding: 3px 6px;
     font-size: 11px;
   }
-  
+
   /* 中等屏幕下的列宽调整 */
   :deep(.t-table__body td:nth-child(5)) {
-    max-width: 150px; /* 地址列在中等屏幕适当缩小 */
+    max-width: 150px;
+    /* 地址列在中等屏幕适当缩小 */
   }
-  
+
   :deep(.t-table__body td:last-child) {
-    width: 25%; /* 操作列在中等屏幕稍微增加空间 */
+    width: 25%;
+    /* 操作列在中等屏幕稍微增加空间 */
   }
 }
 
@@ -2085,40 +2119,43 @@ onMounted(async () => {
   .page-title {
     font-size: 18px;
   }
-  
+
   .stat-number {
     font-size: 20px;
   }
-  
+
   :deep(.t-table) {
     font-size: 12px;
   }
-  
+
   /* 移动端列宽调整 */
   :deep(.t-table__body td:nth-child(5)) {
-    max-width: 120px; /* 地址列在移动端缩小 */
+    max-width: 120px;
+    /* 地址列在移动端缩小 */
   }
-  
+
   :deep(.t-table__body td:nth-child(8)) {
-    width: 12%; /* 经纬度列在移动端缩小 */
+    width: 12%;
+    /* 经纬度列在移动端缩小 */
   }
-  
+
   :deep(.t-table__body td:last-child) {
-    width: 30%; /* 操作列在移动端保持合适空间 */
+    width: 30%;
+    /* 操作列在移动端保持合适空间 */
   }
-  
+
   /* 表格操作列优化 */
   :deep(.t-table .t-space) {
     gap: 3px !important;
   }
-  
+
   :deep(.t-table .t-button--size-small) {
     padding: 3px 6px;
     font-size: 11px;
     width: 100%;
     justify-content: center;
   }
-  
+
   /* 下拉菜单在移动端优化 */
   :deep(.t-table .t-dropdown) {
     width: 100%;
